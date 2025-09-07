@@ -4,16 +4,22 @@
       "label": "Siding Styles",
       "options": [
         {
-          "value": "Gray Cedar Shake Siding",
-          "label": "Gray Cedar Shake",
-          "colors": ["Light Gray", "Stormy Gray", "Charcoal"],
-          "imageUrl": "https://i.imgur.com/8z8f2Yj.jpeg"
+          "value": "Grey Shake Siding",
+          "label": "Grey Shake",
+          "colors": ["Ash Grey", "Stone Grey", "Pewter"],
+          "imageUrls": [
+            "https://i.imgur.com/IejPfe4.jpeg",
+            "https://i.imgur.com/S2w4v7G.jpeg"
+          ]
         },
         {
-          "value": "Beige Horizontal Siding",
-          "label": "Beige Horizontal",
-          "colors": ["Beige", "Tan", "Khaki"],
-          "imageUrl": "https://i.imgur.com/K3Z4Ym1.jpeg"
+          "value": "Brightwood Horizontal Siding",
+          "label": "Brightwood",
+          "colors": ["Brightwood", "Natural Oak", "Golden Pine"],
+          "imageUrls": [
+            "https://i.imgur.com/Nn8sMuq.jpeg",
+            "https://i.imgur.com/dNJiP2a.jpeg"
+          ]
         }
       ]
     }
@@ -23,45 +29,51 @@
       "label": "Asphalt Shingles",
       "options": [
         {
-          "value": "Onyx Black Asphalt Shingles",
-          "label": "Onyx Black",
-          "colors": ["Onyx Black", "Charcoal"],
-          "imageUrl": "https://i.imgur.com/0uB3C8V.jpeg"
+          "value": "Classic Asphalt Shingles",
+          "label": "Asphalt",
+          "colors": ["Asphalt", "Dark Gray"],
+          "imageUrls": ["https://i.imgur.com/9ogfiLr.jpeg", "https://i.imgur.com/aNJrQOt.jpeg"]
         },
         {
-          "value": "Weathered Wood Asphalt Shingles",
-          "label": "Weathered Wood",
-          "colors": ["Weathered Wood", "Driftwood"],
-          "imageUrl": "https://i.imgur.com/r8YfJj3.jpeg"
+          "value": "Coffee Brown Shingles",
+          "label": "Coffee",
+          "colors": ["Coffee Brown", "Mocha", "Dark Roast"],
+          "imageUrls": ["https://i.imgur.com/rQrwGXS.jpeg", "https://i.imgur.com/a2erxoo.jpeg"]
         },
         {
-          "value": "Desert Tan Asphalt Shingles",
-          "label": "Desert Tan",
-          "colors": ["Desert Tan", "Shakewood"],
-          "imageUrl": "https://i.imgur.com/yO3sB9A.jpeg"
+          "value": "Browntown Shingles",
+          "label": "Browntown",
+          "colors": ["Browntown", "Earthy Brown", "Saddle"],
+          "imageUrls": ["https://i.imgur.com/a2erxoo.jpeg", "https://i.imgur.com/rQrwGXS.jpeg"]
         },
         {
-          "value": "Pewter Gray Asphalt Shingles",
-          "label": "Pewter Gray",
-          "colors": ["Pewter Gray", "Colonial Slate"],
-          "imageUrl": "https://i.imgur.com/s6z7W9p.jpeg"
+          "value": "Charcoal Shingles",
+          "label": "Charcoal",
+          "colors": ["Charcoal", "Onyx Black"],
+          "imageUrls": ["https://i.imgur.com/aNJrQOt.jpeg", "https://i.imgur.com/P2WjA1h.jpeg"]
         },
         {
-          "value": "Autumn Blend Asphalt Shingles",
-          "label": "Autumn Blend",
-          "colors": ["Mission Brown", "Barkwood"],
-          "imageUrl": "https://i.imgur.com/t3x3a9G.jpeg"
+          "value": "Light Charcoal Shingles",
+          "label": "Light Charcoal",
+          "colors": ["Light Charcoal", "Pewter Gray", "Stone Gray"],
+          "imageUrls": ["https://i.imgur.com/P2WjA1h.jpeg", "https://i.imgur.com/aNJrQOt.jpeg"]
+        },
+        {
+          "value": "Bohemian Brown Shingles",
+          "label": "Bohemian Brown",
+          "colors": ["Bohemian Brown", "Rustic Brown", "Multi-tone Brown"],
+          "imageUrls": ["https://i.imgur.com/TSIItyq.jpeg", "https://i.imgur.com/9ogfiLr.jpeg"]
         }
       ]
     },
     {
-      "label": "Tile Roofing",
+      "label": "Tile",
       "options": [
         {
-          "value": "Terracotta Spanish Tile Roofing",
-          "label": "Terracotta Spanish Tile",
-          "colors": ["Terracotta", "Adobe Red", "Spanish Clay"],
-          "imageUrl": "https://i.imgur.com/N7bV3Nn.jpeg"
+          "value": "Terracotta Clay Tile",
+          "label": "Clay Tile",
+          "colors": ["Terracotta Clay", "Adobe Red", "Spanish Clay"],
+          "imageUrls": ["https://i.imgur.com/zgJtcD3.jpeg", "https://i.imgur.com/L1pB0G3.jpeg"]
         }
       ]
     }
@@ -71,16 +83,22 @@
       "label": "Trim Boards",
       "options": [
         {
-          "value": "Classic White Trim",
-          "label": "Classic White",
+          "value": "Pure White Trim",
+          "label": "Pure White",
           "colors": ["White"],
-          "imageUrl": "https://i.imgur.com/9vB4w7L.jpeg"
+          "imageUrls": [
+            "https://i.imgur.com/k2H1z5F.jpeg",
+            "https://i.imgur.com/9vB4w7L.jpeg"
+          ]
         },
         {
           "value": "Modern Black Trim",
           "label": "Modern Black",
           "colors": ["Black"],
-          "imageUrl": "https://i.imgur.com/2pD1M1x.jpeg"
+          "imageUrls": [
+            "https://i.imgur.com/sQ8nL8R.jpeg",
+            "https://i.imgur.com/2pD1M1x.jpeg"
+          ]
         }
       ]
     }
@@ -90,16 +108,22 @@
       "label": "Front Doors",
       "options": [
         {
-          "value": "Craftsman Style Blue Door",
-          "label": "Craftsman Blue",
-          "colors": ["Navy Blue", "Deep Ocean", "Royal Blue"],
-          "imageUrl": "https://i.imgur.com/bW3g1pE.jpeg"
+          "value": "Blue Oak Front Door",
+          "label": "Blue Oak",
+          "colors": ["Blue Oak", "Navy Blue", "Royal Blue"],
+          "imageUrls": [
+            "https://i.imgur.com/MHFFJ9G.jpeg",
+            "https://i.imgur.com/4fX8v7p.jpeg"
+          ]
         },
         {
-          "value": "Craftsman Style Oak Door",
-          "label": "Craftsman Oak",
-          "colors": ["Natural Oak", "Walnut Stain", "Golden Pecan"],
-          "imageUrl": "https://i.imgur.com/7gN0Q8r.jpeg"
+          "value": "White Oak Front Door",
+          "label": "White Oak",
+          "colors": ["White Oak", "Natural Wood", "Light Oak"],
+          "imageUrls": [
+            "https://i.imgur.com/SBqcaRq.jpeg",
+            "https://i.imgur.com/J3eQ9hN.jpeg"
+          ]
         }
       ]
     }

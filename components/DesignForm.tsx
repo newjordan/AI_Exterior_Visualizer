@@ -1,11 +1,9 @@
 import React from 'react';
-// FIX: Import ProductData type and remove missing constants import.
 import type { DesignOptions, ProductCategory, ProductOption, ProductData } from '../types';
 
 interface DesignFormProps {
   options: DesignOptions;
   setOptions: React.Dispatch<React.SetStateAction<DesignOptions>>;
-  // FIX: Add productData prop to supply product information dynamically.
   productData: ProductData;
 }
 
@@ -27,7 +25,8 @@ const ProductCard: React.FC<{ product: ProductOption, isSelected: boolean, onSel
         aria-pressed={isSelected}
     >
         <div className="h-24 w-full bg-gray-100">
-            <img src={product.imageUrl} alt={product.label} className="object-cover w-full h-full" />
+            {/* FIX: Use `imageUrls[0]` instead of non-existent `imageUrl` to match the ProductOption type. */}
+            <img src={product.imageUrls[0]} alt={product.label} className="object-cover w-full h-full" />
         </div>
         <div className="p-3 bg-white">
             <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>{product.label}</p>
@@ -53,7 +52,6 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, pro
         let categories: ProductCategory[] = [];
         let colorField: keyof DesignOptions = 'sidingColor';
 
-        // FIX: Use productData from props instead of missing constants.
         if (field === 'sidingProduct') {
             categories = productData.siding;
             colorField = 'sidingColor';
@@ -81,7 +79,6 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, pro
         setOptions(prev => ({ ...prev, [field]: value }));
     };
 
-    // FIX: Use productData from props to find available colors.
     const sidingColors = findColorsForProduct(productData.siding, options.sidingProduct);
     const trimColors = findColorsForProduct(productData.trim, options.trimProduct);
     const doorColors = findColorsForProduct(productData.door, options.doorProduct);
@@ -130,7 +127,6 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, pro
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <h2 className="text-2xl font-bold text-gray-700 mb-6">2. Choose Your Products</h2>
             <div className="space-y-8">
-                {/* FIX: Pass product data from props into rendering function. */}
                 {renderProductGroup("Siding", productData.siding, options.sidingProduct, (value) => handleProductChange('sidingProduct', value), sidingColors, options.sidingColor, (value) => handleColorChange('sidingColor', value))}
                 
                 <div className="pt-8 border-t border-gray-200">

@@ -2,121 +2,183 @@ import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { InitialScreen } from './components/InitialScreen';
-import { AiScan } from './components/AiScan';
 import { DesignStudio } from './components/DesignStudio';
-import { ResultModal } from './components/ResultModal';
+import { MaskingScreen } from './components/MaskingScreen';
+import { ResultDisplay } from './components/ResultDisplay';
 import { Loader } from './components/Loader';
-import type { ProductData } from './types';
+import { generateMasks, applyChangesIteratively } from './services/geminiService';
+import type { DesignOptions, ProductData, HouseMasks, MaskingProgress, GenerationProgress } from './types';
 
-type AppState = 'loading' | 'initial' | 'scanning' | 'designing' | 'result';
+type AppScreen = 'initial' | 'design' | 'masking' | 'result';
 
 const App: React.FC = () => {
-  const [appState, setAppState] = useState<AppState>('loading');
+  const [screen, setScreen] = useState<AppScreen>('initial');
   const [error, setError] = useState<string | null>(null);
-  const [originalImage, setOriginalImage] = useState<{ file: File; url: string } | null>(null);
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [productData, setProductData] = useState<ProductData | null>(null);
+  
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>('');
+  
+  const [masks, setMasks] = useState<HouseMasks>({});
+  const [maskingProgress, setMaskingProgress] = useState<MaskingProgress | null>(null);
 
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string>('');
+  const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({ active: false, message: '', percentage: 0 });
+  
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await fetch('/products.json');
         if (!response.ok) {
-          throw new Error('Failed to load product catalog');
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data: ProductData = await response.json();
         setProductData(data);
-        setAppState('initial');
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred.');
-        setAppState('initial'); // Or an error state
+      } catch (e) {
+        console.error("Failed to fetch product data:", e);
+        setError("Could not load the product catalog. Please try refreshing the page.");
+      }
+    };
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
+
+  const handleImageSelected = async (file: File, url: string) => {
+    setImageFile(file);
+    setImageUrl(url);
+    setError(null);
+    setMasks({}); // Reset previous masks
+    
+    const initialProgress: MaskingProgress = {
+      siding: 'pending',
+      roofing: 'pending',
+      trim: 'pending',
+      door: 'pending',
+    };
+    setMaskingProgress(initialProgress);
+    setScreen('masking');
+
+    const progressCallback = (element: keyof HouseMasks, status: 'generating' | 'complete' | 'error', data?: string) => {
+      setMaskingProgress(prev => ({ ...prev!, [element]: status }));
+      if (status === 'complete' && data) {
+        setMasks(prev => ({ ...prev, [element]: data }));
       }
     };
 
-    fetchProducts();
-  }, []);
-  
-  const handleImageSelected = (file: File, url: string) => {
-    setOriginalImage({ file, url });
-    setAppState('scanning');
+    try {
+      const generatedMasks = await generateMasks(file, progressCallback);
+      setMasks(generatedMasks);
+      setScreen('design');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during AI analysis.');
+      handleReset(); // Go back to start on total failure
+    }
   };
 
-  const handleScanComplete = () => {
-    setAppState('designing');
-  };
-  
-  const handleGenerationComplete = (url: string) => {
-    setGeneratedImageUrl(url);
-    setAppState('result');
-  };
 
-  const handleCloseResult = () => {
-    setAppState('designing');
+  const handleGenerate = async (options: DesignOptions) => {
+    if (!imageFile) {
+      setError('Cannot generate design without an image.');
+      return;
+    }
+    setGenerationProgress({ active: true, message: 'Starting visualization...', percentage: 0 });
+    setError(null);
+    
+    const progressCallback = (message: string, percentage: number) => {
+        setGenerationProgress({ active: true, message, percentage });
+    };
+
+    try {
+      const generatedImageBase64 = await applyChangesIteratively(imageFile, masks, options, progressCallback);
+      setGeneratedImageUrl(`data:image/png;base64,${generatedImageBase64}`);
+      setScreen('result');
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred during image generation.');
+      setScreen('design');
+    } finally {
+      setGenerationProgress({ active: false, message: '', percentage: 0 });
+    }
   };
 
   const handleReset = () => {
-    setOriginalImage(null);
-    setGeneratedImageUrl(null);
+    setScreen('initial');
+    setImageFile(null);
+    setImageUrl('');
+    setMasks({});
+    setGeneratedImageUrl('');
+    setMaskingProgress(null);
+    setGenerationProgress({ active: false, message: '', percentage: 0 });
     setError(null);
-    setAppState('initial');
   };
+  
+  const handleImageChangeOnDesignScreen = (file: File | null, url: string) => {
+     if (file && url) {
+        handleImageSelected(file, url);
+     }
+  }
 
-  const renderContent = () => {
-    if (appState === 'loading' || !productData) {
-        return (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
+  const renderScreen = () => {
+    if (!productData && !error) {
+      return (
+        <div className="flex-grow flex items-center justify-center">
+            <div className="text-center">
                 <Loader size="lg" />
-                <p className="text-slate-300">Loading design library...</p>
+                <p className="mt-4 text-slate-300">Loading Design Options...</p>
             </div>
-        );
-    }
-    
-    if (error && !productData) {
-         return (
-             <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
-                 <h2 className="text-2xl font-bold text-red-400">Failed to Load Products</h2>
-                 <p className="text-slate-300">{error}</p>
-                 <button onClick={() => window.location.reload()} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                     Retry
-                 </button>
-             </div>
-         );
+        </div>
+      );
     }
 
-    switch (appState) {
+    switch (screen) {
       case 'initial':
         return <InitialScreen onImageSelected={handleImageSelected} onError={setError} />;
-      case 'scanning':
-        return originalImage ? <AiScan imageUrl={originalImage.url} onScanComplete={handleScanComplete} /> : null;
-      case 'designing':
+      case 'masking':
+        return <MaskingScreen progress={maskingProgress} masks={masks} />;
+      case 'design':
+        return (
+          <DesignStudio
+            imageFile={imageFile}
+            imageUrl={imageUrl}
+            onImageChange={handleImageChangeOnDesignScreen}
+            productData={productData!} // We know it's loaded here
+            onGenerate={handleGenerate}
+            generationProgress={generationProgress}
+          />
+        );
       case 'result':
-        return originalImage ? (
-            <DesignStudio
-                originalImage={originalImage}
-                onGenerationComplete={handleGenerationComplete}
-                generatedImageUrl={generatedImageUrl}
-                productData={productData}
-                onReset={handleReset}
-            />
-        ) : null;
+        return (
+          <div className="container mx-auto px-4 py-8">
+            <ResultDisplay originalImageUrl={imageUrl} generatedImageUrl={generatedImageUrl} />
+          </div>
+        );
       default:
-        return null;
+        return <InitialScreen onImageSelected={handleImageSelected} onError={setError} />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-white flex flex-col font-sans">
-      <Header onReset={handleReset} showReset={appState === 'designing' || appState === 'result'} />
-      <main className="flex-grow container mx-auto px-4 py-8 flex flex-col">
-        {renderContent()}
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans bg-[radial-gradient(circle_at_1px_1px,#334155_1px,transparent_0)] [background-size:24px_24px]">
+      <Header onReset={handleReset} showReset={screen !== 'initial'} />
+      <main className="flex-grow flex flex-col">
+        {error && (
+           <div className="container mx-auto px-4 mt-4">
+            <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg" role="alert">
+              <strong className="font-bold">An error occurred: </strong>
+              <span className="mt-1 block sm:inline">{error}</span>
+            </div>
+          </div>
+        )}
+        {renderScreen()}
       </main>
       <Footer />
-      {appState === 'result' && generatedImageUrl && (
-          <ResultModal
-              imageUrl={generatedImageUrl}
-              onClose={handleCloseResult}
-          />
-      )}
     </div>
   );
 };
