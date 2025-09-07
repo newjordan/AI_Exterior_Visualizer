@@ -1,11 +1,12 @@
 import React from 'react';
 
 interface LoaderProps {
-    size?: 'sm' | 'md' | 'lg';
+    size?: 'xs' | 'sm' | 'md' | 'lg';
 }
 
 export const Loader: React.FC<LoaderProps> = ({ size = 'md' }) => {
     const sizeClasses = {
+        xs: 'h-4 w-4',
         sm: 'h-5 w-5',
         md: 'h-8 w-8',
         lg: 'h-16 w-16',

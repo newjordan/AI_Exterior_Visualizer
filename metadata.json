@@ -1,5 +1,7 @@
 {
   "name": "This Beautiful House",
   "description": "An AI-powered tool to visualize real-world siding, trim, and door products on an image of your home. Upload a photo, select your products and colors, and see a photorealistic rendering of your home's new look.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

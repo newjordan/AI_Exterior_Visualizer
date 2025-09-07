@@ -6,8 +6,9 @@ import { DesignStudio } from './components/DesignStudio';
 import { MaskingScreen } from './components/MaskingScreen';
 import { ResultDisplay } from './components/ResultDisplay';
 import { Loader } from './components/Loader';
-import { generateMasks, applyChangesIteratively } from './services/geminiService';
-import type { DesignOptions, ProductData, HouseMasks, MaskingProgress, GenerationProgress } from './types';
+import { DevPanel } from './components/DevPanel'; // Import the new DevPanel
+import { generateMasks, applyChangesIteratively, generateSingleMask } from './services/geminiService';
+import type { DesignOptions, ProductData, HouseMasks, MaskingProgress, GenerationProgress, ProductOption } from './types';
 
 type AppScreen = 'initial' | 'design' | 'masking' | 'result';
 
@@ -25,6 +26,10 @@ const App: React.FC = () => {
   const [generatedImageUrl, setGeneratedImageUrl] = useState<string>('');
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({ active: false, message: '', percentage: 0 });
   
+  const [customMaterials, setCustomMaterials] = useState<Partial<Record<keyof ProductData, File>>>({});
+  
+  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false); // State for Dev Panel
+
   useEffect(() => {
     const fetchProducts = async () => {
       try {
@@ -82,6 +87,19 @@ const App: React.FC = () => {
     }
   };
 
+  const findProductImageUrl = (productName: string): string | undefined => {
+      if (!productData) return undefined;
+      for (const categoryKey of Object.keys(productData)) {
+          const key = categoryKey as keyof ProductData;
+          for (const category of productData[key]) {
+              const product = category.options.find(p => p.value === productName);
+              if (product) {
+                  return product.imageUrls[0];
+              }
+          }
+      }
+      return undefined;
+  };
 
   const handleGenerate = async (options: DesignOptions) => {
     if (!imageFile) {
@@ -95,8 +113,15 @@ const App: React.FC = () => {
         setGenerationProgress({ active: true, message, percentage });
     };
 
+    const selectedImageFiles: Partial<Record<keyof ProductData, File | string>> = {
+      siding: options.sidingProduct === 'custom-siding' ? customMaterials.siding : findProductImageUrl(options.sidingProduct),
+      roofing: options.roofingProduct === 'custom-roofing' ? customMaterials.roofing : findProductImageUrl(options.roofingProduct),
+      trim: options.trimProduct === 'custom-trim' ? customMaterials.trim : findProductImageUrl(options.trimProduct),
+      door: options.doorProduct === 'custom-door' ? customMaterials.door : findProductImageUrl(options.doorProduct),
+    };
+
     try {
-      const generatedImageBase64 = await applyChangesIteratively(imageFile, masks, options, progressCallback);
+      const generatedImageBase64 = await applyChangesIteratively(imageFile, masks, options, selectedImageFiles, progressCallback);
       setGeneratedImageUrl(`data:image/png;base64,${generatedImageBase64}`);
       setScreen('result');
     } catch (err) {
@@ -117,6 +142,8 @@ const App: React.FC = () => {
     setMaskingProgress(null);
     setGenerationProgress({ active: false, message: '', percentage: 0 });
     setError(null);
+    setCustomMaterials({});
+    setIsDevPanelOpen(false);
   };
   
   const handleImageChangeOnDesignScreen = (file: File | null, url: string) => {
@@ -124,6 +151,27 @@ const App: React.FC = () => {
         handleImageSelected(file, url);
      }
   }
+
+  const handleCustomMaterialAdded = (category: keyof ProductData, file: File) => {
+    setCustomMaterials(prev => ({ ...prev, [category]: file }));
+  };
+
+  const handleRegenerateMask = async (element: keyof HouseMasks) => {
+    if (!imageFile) {
+        setError("Cannot regenerate mask without the original image.");
+        return;
+    }
+    setMaskingProgress(prev => ({ ...prev!, [element]: 'generating' }));
+    try {
+        const newMaskData = await generateSingleMask(imageFile, element);
+        setMasks(prev => ({ ...prev, [element]: newMaskData }));
+        setMaskingProgress(prev => ({ ...prev!, [element]: 'complete' }));
+    } catch (err) {
+        console.error(`Failed to re-generate mask for ${element}:`, err);
+        setError(`Failed to re-generate the ${element} mask.`);
+        setMaskingProgress(prev => ({ ...prev!, [element]: 'error' }));
+    }
+  };
 
   const renderScreen = () => {
     if (!productData && !error) {
@@ -151,6 +199,8 @@ const App: React.FC = () => {
             productData={productData!} // We know it's loaded here
             onGenerate={handleGenerate}
             generationProgress={generationProgress}
+            customMaterials={customMaterials}
+            onCustomMaterialAdded={handleCustomMaterialAdded}
           />
         );
       case 'result':
@@ -179,6 +229,23 @@ const App: React.FC = () => {
         {renderScreen()}
       </main>
       <Footer />
+      {screen === 'design' && Object.keys(masks).length > 0 && (
+          <button
+              onClick={() => setIsDevPanelOpen(true)}
+              className="fixed bottom-4 right-4 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-lg hover:bg-blue-700 transition-colors z-50"
+          >
+              Dev
+          </button>
+      )}
+      {isDevPanelOpen && (
+          <DevPanel
+              originalImage={imageUrl}
+              masks={masks}
+              onClose={() => setIsDevPanelOpen(false)}
+              onRegenerate={handleRegenerateMask}
+              progress={maskingProgress}
+          />
+      )}
     </div>
   );
 };

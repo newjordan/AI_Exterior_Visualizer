@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import type { DesignOptions, ProductCategory, ProductOption, ProductData } from '../types';
+import { CameraIcon } from './icons/CameraIcon';
 
 interface DesignFormProps {
   options: DesignOptions;
   setOptions: React.Dispatch<React.SetStateAction<DesignOptions>>;
   productData: ProductData;
+  onMaterialCaptured: (category: keyof ProductData, file: File) => void;
 }
 
 const findColorsForProduct = (categories: ProductCategory[], productName: string): string[] => {
@@ -25,7 +27,6 @@ const ProductCard: React.FC<{ product: ProductOption, isSelected: boolean, onSel
         aria-pressed={isSelected}
     >
         <div className="h-24 w-full bg-gray-100">
-            {/* FIX: Use `imageUrls[0]` instead of non-existent `imageUrl` to match the ProductOption type. */}
             <img src={product.imageUrls[0]} alt={product.label} className="object-cover w-full h-full" />
         </div>
         <div className="p-3 bg-white">
@@ -33,6 +34,36 @@ const ProductCard: React.FC<{ product: ProductOption, isSelected: boolean, onSel
         </div>
     </button>
 );
+
+const CaptureCard: React.FC<{ onFileCaptured: (file: File) => void }> = ({ onFileCaptured }) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            onFileCaptured(file);
+        }
+    };
+    
+    return (
+        <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="flex flex-col items-center justify-center w-full h-full text-left rounded-lg p-3 border-2 border-dashed border-slate-400 bg-slate-200 hover:bg-slate-300 hover:border-slate-500 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+            <CameraIcon className="w-10 h-10 text-slate-600 mb-2" />
+            <span className="text-sm font-semibold text-slate-700 text-center">Use Your Own</span>
+             <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileChange}
+                className="hidden"
+             />
+        </button>
+    )
+}
 
 const ColorSwatch: React.FC<{ color: string, isSelected: boolean, onSelect: () => void }> = ({ color, isSelected, onSelect }) => (
     <button
@@ -46,7 +77,7 @@ const ColorSwatch: React.FC<{ color: string, isSelected: boolean, onSelect: () =
     </button>
 );
 
-export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, productData }) => {
+export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, productData, onMaterialCaptured }) => {
 
     const handleProductChange = (field: keyof DesignOptions, value: string) => {
         let categories: ProductCategory[] = [];
@@ -71,7 +102,7 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, pro
         setOptions(prev => ({
             ...prev,
             [field]: value,
-            [colorField]: newColors[0] || '',
+            [colorField]: newColors[0] || 'Custom',
         }));
     };
     
@@ -79,66 +110,89 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, pro
         setOptions(prev => ({ ...prev, [field]: value }));
     };
 
+    const handleFileCaptured = (categoryKey: keyof ProductData, field: keyof DesignOptions, file: File) => {
+        onMaterialCaptured(categoryKey, file);
+        // Auto-select the newly captured material
+        setOptions(prev => ({
+            ...prev,
+            [field]: `custom-${categoryKey}`,
+            [`${categoryKey}Color`]: 'Custom'
+        }));
+    };
+
     const sidingColors = findColorsForProduct(productData.siding, options.sidingProduct);
     const trimColors = findColorsForProduct(productData.trim, options.trimProduct);
     const doorColors = findColorsForProduct(productData.door, options.doorProduct);
     const roofingColors = findColorsForProduct(productData.roofing, options.roofingProduct);
 
-    const renderProductGroup = (title: string, categories: ProductCategory[], selectedProduct: string, onProductChange: (value: string) => void, availableColors: string[], selectedColor: string, onColorChange: (value: string) => void) => (
-        <div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">{title}</h3>
-            <div className="space-y-4">
-                {categories.map(category => (
-                    <div key={category.label}>
-                        <h4 className="text-md font-semibold text-gray-600 mb-3">{category.label}</h4>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {category.options.map(product => (
-                                <ProductCard
-                                    key={product.value}
-                                    product={product}
-                                    isSelected={selectedProduct === product.value}
-                                    onSelect={() => onProductChange(product.value)}
+    const renderProductGroup = (
+        title: string, 
+        categoryKey: keyof ProductData,
+        productField: keyof DesignOptions,
+        colorField: keyof DesignOptions
+    ) => {
+        const categories = productData[categoryKey];
+        const selectedProduct = options[productField];
+        const selectedColor = options[colorField];
+        const availableColors = findColorsForProduct(categories, selectedProduct);
+
+        return (
+            <div>
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">{title}</h3>
+                <div className="space-y-4">
+                    {categories.map(category => (
+                        <div key={category.label}>
+                            <h4 className="text-md font-semibold text-gray-600 mb-3">{category.label}</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                                {category.options.map(product => (
+                                    <ProductCard
+                                        key={product.value}
+                                        product={product}
+                                        isSelected={selectedProduct === product.value}
+                                        onSelect={() => handleProductChange(productField, product.value)}
+                                    />
+                                ))}
+                                <CaptureCard onFileCaptured={(file) => handleFileCaptured(categoryKey, productField, file)} />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {availableColors.length > 0 && (
+                    <div className="mt-6">
+                        <h4 className="text-md font-semibold text-gray-600 mb-3">Color</h4>
+                        <div className="flex flex-wrap gap-3">
+                            {availableColors.map(color => (
+                                <ColorSwatch
+                                    key={color}
+                                    color={color}
+                                    isSelected={selectedColor === color}
+                                    onSelect={() => handleColorChange(colorField, color)}
                                 />
                             ))}
                         </div>
                     </div>
-                ))}
+                )}
             </div>
-
-            {availableColors.length > 0 && (
-                <div className="mt-6">
-                    <h4 className="text-md font-semibold text-gray-600 mb-3">Color</h4>
-                    <div className="flex flex-wrap gap-3">
-                        {availableColors.map(color => (
-                            <ColorSwatch
-                                key={color}
-                                color={color}
-                                isSelected={selectedColor === color}
-                                onSelect={() => onColorChange(color)}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
+        )
+    };
 
     return (
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <h2 className="text-2xl font-bold text-gray-700 mb-6">2. Choose Your Products</h2>
             <div className="space-y-8">
-                {renderProductGroup("Siding", productData.siding, options.sidingProduct, (value) => handleProductChange('sidingProduct', value), sidingColors, options.sidingColor, (value) => handleColorChange('sidingColor', value))}
+                {renderProductGroup("Siding", 'siding', 'sidingProduct', 'sidingColor')}
                 
                 <div className="pt-8 border-t border-gray-200">
-                    {renderProductGroup("Roofing", productData.roofing, options.roofingProduct, (value) => handleProductChange('roofingProduct', value), roofingColors, options.roofingColor, (value) => handleColorChange('roofingColor', value))}
+                    {renderProductGroup("Roofing", 'roofing', 'roofingProduct', 'roofingColor')}
                 </div>
 
                 <div className="pt-8 border-t border-gray-200">
-                    {renderProductGroup("Trim", productData.trim, options.trimProduct, (value) => handleProductChange('trimProduct', value), trimColors, options.trimColor, (value) => handleColorChange('trimColor', value))}
+                    {renderProductGroup("Trim", 'trim', 'trimProduct', 'trimColor')}
                 </div>
 
                 <div className="pt-8 border-t border-gray-200">
-                    {renderProductGroup("Front Door", productData.door, options.doorProduct, (value) => handleProductChange('doorProduct', value), doorColors, options.doorColor, (value) => handleColorChange('doorColor', value))}
+                    {renderProductGroup("Front Door", 'door', 'doorProduct', 'doorColor')}
                 </div>
             </div>
         </div>

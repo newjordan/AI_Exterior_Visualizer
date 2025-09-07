@@ -29,18 +29,22 @@ export interface DesignOptions {
   doorColor: string;
 }
 
+// FIX: Removed the broad index signature "[key: string]: string | undefined;".
+// This makes the type more specific and prevents incorrect TypeScript type inference
+// for objects with computed properties, resolving the errors in App.tsx.
 export interface HouseMasks {
   siding?: string; // base64 encoded image
   roofing?: string;
   trim?: string;
   door?: string;
-  [key: string]: string | undefined;
 }
 
 export type MaskingStatus = 'pending' | 'generating' | 'complete' | 'error';
 
+// FIX: Made properties required with the "-?" modifier to match the type's usage (e.g., initialProgress in App.tsx).
+// This ensures type safety and correctness when updating the masking progress state.
 export type MaskingProgress = {
-  [key in keyof HouseMasks]: MaskingStatus;
+  [key in keyof HouseMasks]-?: MaskingStatus;
 };
 
 export type GenerationProgress = {

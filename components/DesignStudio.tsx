@@ -1,10 +1,8 @@
-
-// FIX: Create the DesignStudio component, which serves as the main user interface for designing the house exterior.
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ImageUploader } from './ImageUploader';
 import { DesignForm } from './DesignForm';
 import { Loader } from './Loader';
-import type { DesignOptions, ProductData, GenerationProgress } from '../types';
+import type { DesignOptions, ProductData, GenerationProgress, ProductOption } from '../types';
 
 interface DesignStudioProps {
   imageFile: File | null;
@@ -13,7 +11,38 @@ interface DesignStudioProps {
   productData: ProductData;
   onGenerate: (options: DesignOptions) => void;
   generationProgress: GenerationProgress;
+  customMaterials: Partial<Record<keyof ProductData, File>>;
+  onCustomMaterialAdded: (category: keyof ProductData, file: File) => void;
 }
+
+const augmentProductData = (baseData: ProductData, customMaterials: Partial<Record<keyof ProductData, File>>): ProductData => {
+    const augmentedData = JSON.parse(JSON.stringify(baseData));
+
+    for (const key in customMaterials) {
+        const category = key as keyof ProductData;
+        const file = customMaterials[category];
+        if (file) {
+            const customOption: ProductOption = {
+                value: `custom-${category}`,
+                label: `My ${category.charAt(0).toUpperCase() + category.slice(1)}`,
+                imageUrls: [URL.createObjectURL(file)],
+                colors: ['Custom'],
+            };
+            // Add to the first category group, or create one if none exist
+            if (!augmentedData[category][0]) {
+                augmentedData[category][0] = { label: 'Custom', options: [] };
+            }
+            // Remove previous custom option if it exists
+            augmentedData[category][0].options = augmentedData[category][0].options.filter(
+                (opt: ProductOption) => !opt.value.startsWith('custom-')
+            );
+            // Add the new one to the beginning
+            augmentedData[category][0].options.unshift(customOption);
+        }
+    }
+    return augmentedData;
+};
+
 
 export const DesignStudio: React.FC<DesignStudioProps> = ({
   imageFile,
@@ -22,8 +51,9 @@ export const DesignStudio: React.FC<DesignStudioProps> = ({
   productData,
   onGenerate,
   generationProgress,
+  customMaterials,
+  onCustomMaterialAdded
 }) => {
-  // Initialize with the first available options from product data
   const [options, setOptions] = useState<DesignOptions>({
     sidingProduct: productData.siding[0]?.options[0]?.value || '',
     sidingColor: productData.siding[0]?.options[0]?.colors[0] || '',
@@ -41,6 +71,19 @@ export const DesignStudio: React.FC<DesignStudioProps> = ({
       onImageChange(file, newUrl);
     }
   };
+
+  const augmentedData = augmentProductData(productData, customMaterials);
+  
+  useEffect(() => {
+    // Revoke object URLs on unmount to prevent memory leaks
+    return () => {
+        Object.values(customMaterials).forEach(file => {
+            if (file) {
+                URL.revokeObjectURL(URL.createObjectURL(file));
+            }
+        });
+    };
+  }, [customMaterials]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -83,7 +126,12 @@ export const DesignStudio: React.FC<DesignStudioProps> = ({
           </div>
         </div>
         <div className="lg:col-span-2">
-          <DesignForm options={options} setOptions={setOptions} productData={productData} />
+          <DesignForm 
+             options={options} 
+             setOptions={setOptions} 
+             productData={augmentedData} 
+             onMaterialCaptured={onCustomMaterialAdded}
+          />
         </div>
       </div>
     </div>
