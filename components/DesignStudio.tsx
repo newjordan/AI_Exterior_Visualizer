@@ -1,21 +1,19 @@
-import React, { useState } from 'react';
-import type { DesignOptions, ProductCategory, ProductOption, ProductCategoryKey } from '../types';
-import { SIDING_OPTIONS, TRIM_OPTIONS, DOOR_OPTIONS, ROOFING_OPTIONS } from '../constants';
+import React, { useState, useMemo } from 'react';
+import type { DesignOptions, ProductCategory, ProductOption, ProductData, ProductCategoryKey } from '../types';
+import { visualizeExteriorDesign } from '../services/geminiService';
+import { ResultDisplay } from './ResultDisplay';
+import { Loader } from './Loader';
 import { SidingIcon } from './icons/SidingIcon';
 import { RoofingIcon } from './icons/RoofingIcon';
 import { TrimIcon } from './icons/TrimIcon';
 import { DoorIcon } from './icons/DoorIcon';
-import { Loader } from './Loader';
-import { ResultDisplay } from './ResultDisplay';
 
 interface DesignStudioProps {
-  imageUrl: string;
-  options: DesignOptions;
-  setOptions: React.Dispatch<React.SetStateAction<DesignOptions>>;
-  onVisualize: () => void;
-  isLoading: boolean;
+  originalImage: { file: File; url: string };
+  onGenerationComplete: (url: string) => void;
   generatedImageUrl: string | null;
-  onStartOver: () => void;
+  productData: ProductData;
+  onReset: () => void;
 }
 
 const findColorsForProduct = (categories: ProductCategory[], productName: string): string[] => {
@@ -26,18 +24,26 @@ const findColorsForProduct = (categories: ProductCategory[], productName: string
     return [];
 };
 
+const findImageUrlForProduct = (categories: ProductCategory[], productName: string): string | undefined => {
+    for (const category of categories) {
+        const product = category.options.find((p) => p.value === productName);
+        if (product) return product.imageUrl;
+    }
+    return undefined;
+};
+
 const ProductCard: React.FC<{ product: ProductOption, isSelected: boolean, onSelect: () => void }> = ({ product, isSelected, onSelect }) => (
     <button
         type="button"
         onClick={onSelect}
-        className={`block w-full text-left rounded-lg overflow-hidden border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isSelected ? 'border-blue-600 shadow-lg' : 'border-gray-200 hover:border-blue-500 hover:shadow-md'}`}
+        className={`group block w-full text-left rounded-xl overflow-hidden border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-400 ${isSelected ? 'border-blue-500 shadow-lg' : 'border-slate-600/80 hover:border-slate-500 hover:shadow-md bg-slate-900/20'}`}
         aria-pressed={isSelected}
     >
-        <div className="h-24 w-full bg-gray-100">
-            <img src={product.imageUrl} alt={product.label} className="object-cover w-full h-full" />
+        <div className="h-24 w-full bg-slate-700 overflow-hidden">
+            <img src={product.imageUrl} alt={product.label} className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300" />
         </div>
-        <div className="p-3 bg-white">
-            <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-700' : 'text-gray-800'}`}>{product.label}</p>
+        <div className="p-3">
+            <p className={`text-sm font-semibold truncate ${isSelected ? 'text-blue-300' : 'text-slate-200'}`}>{product.label}</p>
         </div>
     </button>
 );
@@ -46,7 +52,7 @@ const ColorSwatch: React.FC<{ color: string, isSelected: boolean, onSelect: () =
     <button
         type="button"
         onClick={onSelect}
-        className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${isSelected ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50 hover:border-gray-400'}`}
+        className={`px-4 py-2 rounded-lg text-sm font-medium border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-400 ${isSelected ? 'bg-blue-600 text-white border-blue-600 scale-105' : 'bg-slate-700/50 text-slate-300 border-slate-600 hover:bg-slate-700 hover:border-slate-500'}`}
         title={color}
         aria-pressed={isSelected}
     >
@@ -54,141 +60,196 @@ const ColorSwatch: React.FC<{ color: string, isSelected: boolean, onSelect: () =
     </button>
 );
 
-const categoryMap: Record<ProductCategoryKey, { title: string; icon: React.FC<any>; options: ProductCategory[], productKey: keyof DesignOptions, colorKey: keyof DesignOptions }> = {
-    siding: { title: "Siding", icon: SidingIcon, options: SIDING_OPTIONS, productKey: 'sidingProduct', colorKey: 'sidingColor'},
-    roofing: { title: "Roofing", icon: RoofingIcon, options: ROOFING_OPTIONS, productKey: 'roofingProduct', colorKey: 'roofingColor' },
-    trim: { title: "Trim", icon: TrimIcon, options: TRIM_OPTIONS, productKey: 'trimProduct', colorKey: 'trimColor'},
-    door: { title: "Front Door", icon: DoorIcon, options: DOOR_OPTIONS, productKey: 'doorProduct', colorKey: 'doorColor'},
-};
+export const DesignStudio: React.FC<DesignStudioProps> = ({ originalImage, onGenerationComplete, generatedImageUrl, productData, onReset }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [activeCategory, setActiveCategory] = useState<ProductCategoryKey>('siding');
 
-export const DesignStudio: React.FC<DesignStudioProps> = ({ imageUrl, options, setOptions, onVisualize, isLoading, generatedImageUrl, onStartOver }) => {
-    const [activeCategory, setActiveCategory] = useState<ProductCategoryKey | null>(null);
+    const [designOptions, setDesignOptions] = useState<DesignOptions>(() => {
+        return {
+            sidingProduct: productData.siding[0].options[0].value,
+            sidingColor: productData.siding[0].options[0].colors[0],
+            trimProduct: productData.trim[0].options[0].value,
+            trimColor: productData.trim[0].options[0].colors[0],
+            doorProduct: productData.door[0].options[0].value,
+            doorColor: productData.door[0].options[0].colors[0],
+            roofingProduct: productData.roofing[0].options[0].value,
+            roofingColor: productData.roofing[0].options[0].colors[0],
+        };
+    });
+    
+    const handleGenerateClick = async () => {
+        setIsLoading(true);
+        setError(null);
 
-    const toggleCategory = (category: ProductCategoryKey) => {
-        setActiveCategory(prev => (prev === category ? null : category));
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(originalImage.file);
+            reader.onloadend = async () => {
+                const base64String = (reader.result as string).split(',')[1];
+                if (!base64String) {
+                    throw new Error("Failed to read image file.");
+                }
+
+                const imageUrls = {
+                    sidingImageUrl: findImageUrlForProduct(productData.siding, designOptions.sidingProduct),
+                    trimImageUrl: findImageUrlForProduct(productData.trim, designOptions.trimProduct),
+                    doorImageUrl: findImageUrlForProduct(productData.door, designOptions.doorProduct),
+                    roofingImageUrl: findImageUrlForProduct(productData.roofing, designOptions.roofingProduct),
+                };
+
+                const resultBase64 = await visualizeExteriorDesign(base64String, originalImage.file.type, designOptions, imageUrls);
+                onGenerationComplete(`data:image/webp;base64,${resultBase64}`);
+            };
+            reader.onerror = () => {
+                 throw new Error("Error reading the selected file.");
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "An unknown error occurred during visualization.");
+        } finally {
+            setIsLoading(false);
+        }
     };
     
-    const handleProductChange = (field: keyof DesignOptions, colorField: keyof DesignOptions, value: string, categories: ProductCategory[]) => {
+    const handleProductChange = (categoryKey: ProductCategoryKey, value: string) => {
+        const categories = productData[categoryKey];
+        const colorField: keyof DesignOptions = `${categoryKey}Color`;
+        const productField: keyof DesignOptions = `${categoryKey}Product`;
         const newColors = findColorsForProduct(categories, value);
-        setOptions(prev => ({
+        
+        setDesignOptions(prev => ({
             ...prev,
-            [field]: value,
+            [productField]: value,
             [colorField]: newColors[0] || '',
         }));
     };
     
-    const handleColorChange = (field: keyof DesignOptions, value: string) => {
-        setOptions(prev => ({ ...prev, [field]: value }));
+    const handleColorChange = (colorField: keyof DesignOptions, value: string) => {
+        setDesignOptions(prev => ({ ...prev, [colorField]: value }));
     };
 
-    const renderProductGroup = (categoryKey: ProductCategoryKey) => {
-        const { title, options: categories, productKey, colorKey } = categoryMap[categoryKey];
-        const selectedProduct = options[productKey];
-        const selectedColor = options[colorKey];
-        const availableColors = findColorsForProduct(categories, selectedProduct);
+    const categoryConfig = useMemo(() => ({
+        siding: {
+            title: "Siding",
+            icon: SidingIcon,
+            categories: productData.siding,
+            selectedProduct: designOptions.sidingProduct,
+            onProductChange: (v: string) => handleProductChange('siding', v),
+            availableColors: findColorsForProduct(productData.siding, designOptions.sidingProduct),
+            selectedColor: designOptions.sidingColor,
+            onColorChange: (v: string) => handleColorChange('sidingColor', v),
+        },
+        roofing: {
+            title: "Roofing",
+            icon: RoofingIcon,
+            categories: productData.roofing,
+            selectedProduct: designOptions.roofingProduct,
+            onProductChange: (v: string) => handleProductChange('roofing', v),
+            availableColors: findColorsForProduct(productData.roofing, designOptions.roofingProduct),
+            selectedColor: designOptions.roofingColor,
+            onColorChange: (v: string) => handleColorChange('roofingColor', v),
+        },
+        trim: {
+            title: "Trim",
+            icon: TrimIcon,
+            categories: productData.trim,
+            selectedProduct: designOptions.trimProduct,
+            onProductChange: (v: string) => handleProductChange('trim', v),
+            availableColors: findColorsForProduct(productData.trim, designOptions.trimProduct),
+            selectedColor: designOptions.trimColor,
+            onColorChange: (v: string) => handleColorChange('trimColor', v),
+        },
+        door: {
+            title: "Front Door",
+            icon: DoorIcon,
+            categories: productData.door,
+            selectedProduct: designOptions.doorProduct,
+            onProductChange: (v: string) => handleProductChange('door', v),
+            availableColors: findColorsForProduct(productData.door, designOptions.doorProduct),
+            selectedColor: designOptions.doorColor,
+            onColorChange: (v: string) => handleColorChange('doorColor', v),
+        },
+    }), [designOptions, productData]);
+    
+    const activeConfig = categoryConfig[activeCategory];
+    
+    return (
+        <div className="flex-grow flex flex-col gap-8 w-full">
+             <div className="w-full max-w-2xl mx-auto">
+                <img src={originalImage.url} alt="Your selected house" className="rounded-xl shadow-2xl w-full" />
+            </div>
 
-        return (
-            <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200 mt-4">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">{`Choose Your ${title}`}</h3>
-                <div className="space-y-4">
-                    {categories.map(category => (
+            <div className="p-6 rounded-xl bg-slate-800/50 backdrop-blur-md border border-slate-700/50 shadow-2xl">
+                <div className="flex items-center border-b border-slate-700/50 mb-6">
+                    {Object.entries(categoryConfig).map(([key, config]) => (
+                        <button
+                            key={key}
+                            onClick={() => setActiveCategory(key as ProductCategoryKey)}
+                            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 ${activeCategory === key ? 'border-blue-400 text-blue-300' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
+                            aria-current={activeCategory === key}
+                        >
+                            <config.icon className="w-5 h-5" />
+                            <span>{config.title}</span>
+                        </button>
+                    ))}
+                </div>
+                <div>
+                     {activeConfig.categories.map(category => (
                         <div key={category.label}>
-                            <h4 className="text-md font-semibold text-gray-600 mb-3">{category.label}</h4>
+                            <h4 className="text-md font-semibold text-slate-300 mb-3">{category.label}</h4>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                                 {category.options.map(product => (
                                     <ProductCard
                                         key={product.value}
                                         product={product}
-                                        isSelected={selectedProduct === product.value}
-                                        onSelect={() => handleProductChange(productKey, colorKey, product.value, categories)}
+                                        isSelected={activeConfig.selectedProduct === product.value}
+                                        onSelect={() => activeConfig.onProductChange(product.value)}
                                     />
                                 ))}
                             </div>
                         </div>
                     ))}
-                </div>
-
-                {availableColors.length > 0 && (
-                    <div className="mt-6">
-                        <h4 className="text-md font-semibold text-gray-600 mb-3">Color</h4>
-                        <div className="flex flex-wrap gap-3">
-                            {availableColors.map(color => (
-                                <ColorSwatch
-                                    key={color}
-                                    color={color}
-                                    isSelected={selectedColor === color}
-                                    onSelect={() => handleColorChange(colorKey, color)}
-                                />
-                            ))}
+                     {activeConfig.availableColors.length > 0 && (
+                        <div className="mt-6">
+                            <h4 className="text-md font-semibold text-slate-300 mb-3">Color</h4>
+                            <div className="flex flex-wrap gap-3">
+                                {activeConfig.availableColors.map(color => (
+                                    <ColorSwatch
+                                        key={color}
+                                        color={color}
+                                        isSelected={activeConfig.selectedColor === color}
+                                        onSelect={() => activeConfig.onColorChange(color)}
+                                    />
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
-        )
-    };
-    
-    return (
-        <div className="w-full flex flex-col items-center">
-             <div className="w-full flex justify-between items-center mb-4">
-                <h2 className="text-3xl font-bold text-gray-800">Design Studio</h2>
-                <button 
-                  onClick={onStartOver}
-                  className="text-sm text-gray-500 hover:text-blue-600 font-medium transition-colors"
-                >
-                  &larr; Start Over
-                </button>
-            </div>
-            
-            <div className="w-full max-w-4xl aspect-[16/9] rounded-xl shadow-2xl overflow-hidden mb-6">
-                <img src={imageUrl} alt="Your house" className="w-full h-full object-cover" />
-            </div>
-
-            <div className="bg-white rounded-xl shadow-lg p-4 border border-gray-200 w-full max-w-4xl">
-                <p className="text-center text-gray-600 font-semibold mb-3">Select a category to start designing:</p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {Object.entries(categoryMap).map(([key, { title, icon: Icon }]) => (
-                         <button 
-                            key={key}
-                            onClick={() => toggleCategory(key as ProductCategoryKey)}
-                            className={`flex flex-col items-center justify-center p-4 rounded-lg border-2 transition-all duration-200 ${activeCategory === key ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-gray-50 border-transparent hover:bg-gray-100 hover:border-gray-300'}`}
-                         >
-                            <Icon className="h-8 w-8 mb-2" />
-                            <span className="font-bold">{title}</span>
-                         </button>
-                    ))}
+                    )}
                 </div>
             </div>
 
-            {activeCategory && (
-                <div className="w-full max-w-4xl">
-                    {renderProductGroup(activeCategory)}
-                </div>
-            )}
-            
-            <div className="mt-8 w-full max-w-4xl">
+            <div className="flex flex-col items-center justify-center gap-4 mt-4">
                 <button
-                    onClick={onVisualize}
+                    onClick={handleGenerateClick}
                     disabled={isLoading}
-                    className="w-full bg-blue-600 text-white font-bold py-4 px-6 rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all duration-300 ease-in-out text-lg flex items-center justify-center gap-3"
+                    className="w-full max-w-md flex items-center justify-center px-8 py-4 text-lg font-bold text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-all transform hover:scale-105"
                 >
                     {isLoading ? (
                         <>
-                            <Loader/>
-                            Visualizing...
+                            <Loader size="sm" />
+                            <span className="ml-3">Visualizing...</span>
                         </>
                     ) : (
-                        <>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 3.104l-1.385 2.423A2.25 2.25 0 016.732 7.5H3.104a2.25 2.25 0 00-1.664 3.836l2.423 1.385A2.25 2.25 0 017.5 14.268v3.628a2.25 2.25 0 003.836 1.664l1.385-2.423A2.25 2.25 0 0114.268 16.5h3.628a2.25 2.25 0 001.664-3.836l-2.423-1.385A2.25 2.25 0 0116.5 9.732V6.104a2.25 2.25 0 00-3.836-1.664L11.28 6.864A2.25 2.25 0 019.75 3.104zM12 12a3 3 0 100-6 3 3 0 000 6z" /></svg>
-                            Visualize My Home!
-                        </>
+                        "Visualize My Home!"
                     )}
                 </button>
+                {error && <p className="text-red-400 text-sm mt-2 text-center">{error}</p>}
             </div>
+
             {generatedImageUrl && (
-                <div className="mt-12 w-full max-w-5xl">
-                    <h2 className="text-3xl font-bold text-gray-800 text-center mb-6">Your Redesigned Home</h2>
-                    <ResultDisplay originalUrl={imageUrl} generatedUrl={generatedImageUrl} />
-                </div>
+                <ResultDisplay
+                    originalImageUrl={originalImage.url}
+                    generatedImageUrl={generatedImageUrl}
+                />
             )}
         </div>
     );
