@@ -1,0 +1,107 @@
+{
+  "siding": [
+    {
+      "label": "Siding Styles",
+      "options": [
+        {
+          "value": "Gray Cedar Shake Siding",
+          "label": "Gray Cedar Shake",
+          "colors": ["Light Gray", "Stormy Gray", "Charcoal"],
+          "imageUrl": "https://i.imgur.com/8z8f2Yj.jpeg"
+        },
+        {
+          "value": "Beige Horizontal Siding",
+          "label": "Beige Horizontal",
+          "colors": ["Beige", "Tan", "Khaki"],
+          "imageUrl": "https://i.imgur.com/K3Z4Ym1.jpeg"
+        }
+      ]
+    }
+  ],
+  "roofing": [
+    {
+      "label": "Asphalt Shingles",
+      "options": [
+        {
+          "value": "Onyx Black Asphalt Shingles",
+          "label": "Onyx Black",
+          "colors": ["Onyx Black", "Charcoal"],
+          "imageUrl": "https://i.imgur.com/0uB3C8V.jpeg"
+        },
+        {
+          "value": "Weathered Wood Asphalt Shingles",
+          "label": "Weathered Wood",
+          "colors": ["Weathered Wood", "Driftwood"],
+          "imageUrl": "https://i.imgur.com/r8YfJj3.jpeg"
+        },
+        {
+          "value": "Desert Tan Asphalt Shingles",
+          "label": "Desert Tan",
+          "colors": ["Desert Tan", "Shakewood"],
+          "imageUrl": "https://i.imgur.com/yO3sB9A.jpeg"
+        },
+        {
+          "value": "Pewter Gray Asphalt Shingles",
+          "label": "Pewter Gray",
+          "colors": ["Pewter Gray", "Colonial Slate"],
+          "imageUrl": "https://i.imgur.com/s6z7W9p.jpeg"
+        },
+        {
+          "value": "Autumn Blend Asphalt Shingles",
+          "label": "Autumn Blend",
+          "colors": ["Mission Brown", "Barkwood"],
+          "imageUrl": "https://i.imgur.com/t3x3a9G.jpeg"
+        }
+      ]
+    },
+    {
+      "label": "Tile Roofing",
+      "options": [
+        {
+          "value": "Terracotta Spanish Tile Roofing",
+          "label": "Terracotta Spanish Tile",
+          "colors": ["Terracotta", "Adobe Red", "Spanish Clay"],
+          "imageUrl": "https://i.imgur.com/N7bV3Nn.jpeg"
+        }
+      ]
+    }
+  ],
+  "trim": [
+    {
+      "label": "Trim Boards",
+      "options": [
+        {
+          "value": "Classic White Trim",
+          "label": "Classic White",
+          "colors": ["White"],
+          "imageUrl": "https://i.imgur.com/9vB4w7L.jpeg"
+        },
+        {
+          "value": "Modern Black Trim",
+          "label": "Modern Black",
+          "colors": ["Black"],
+          "imageUrl": "https://i.imgur.com/2pD1M1x.jpeg"
+        }
+      ]
+    }
+  ],
+  "door": [
+    {
+      "label": "Front Doors",
+      "options": [
+        {
+          "value": "Craftsman Style Blue Door",
+          "label": "Craftsman Blue",
+          "colors": ["Navy Blue", "Deep Ocean", "Royal Blue"],
+          "imageUrl": "https://i.imgur.com/bW3g1pE.jpeg"
+        },
+        {
+          "value": "Craftsman Style Oak Door",
+          "label": "Craftsman Oak",
+          "colors": ["Natural Oak", "Walnut Stain", "Golden Pecan"],
+          "imageUrl": "https://i.imgur.com/7gN0Q8r.jpeg"
+        }
+      ]
+    }
+  ]
+}

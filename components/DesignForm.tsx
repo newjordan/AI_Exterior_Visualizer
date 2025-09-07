@@ -1,10 +1,12 @@
 import React from 'react';
-import type { DesignOptions, ProductCategory, ProductOption } from '../types';
-import { SIDING_OPTIONS, TRIM_OPTIONS, DOOR_OPTIONS, ROOFING_OPTIONS } from '../constants';
+// FIX: Import ProductData type and remove missing constants import.
+import type { DesignOptions, ProductCategory, ProductOption, ProductData } from '../types';
 
 interface DesignFormProps {
   options: DesignOptions;
   setOptions: React.Dispatch<React.SetStateAction<DesignOptions>>;
+  // FIX: Add productData prop to supply product information dynamically.
+  productData: ProductData;
 }
 
 const findColorsForProduct = (categories: ProductCategory[], productName: string): string[] => {
@@ -45,23 +47,24 @@ const ColorSwatch: React.FC<{ color: string, isSelected: boolean, onSelect: () =
     </button>
 );
 
-export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions }) => {
+export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions, productData }) => {
 
     const handleProductChange = (field: keyof DesignOptions, value: string) => {
         let categories: ProductCategory[] = [];
         let colorField: keyof DesignOptions = 'sidingColor';
 
+        // FIX: Use productData from props instead of missing constants.
         if (field === 'sidingProduct') {
-            categories = SIDING_OPTIONS;
+            categories = productData.siding;
             colorField = 'sidingColor';
         } else if (field === 'trimProduct') {
-            categories = TRIM_OPTIONS;
+            categories = productData.trim;
             colorField = 'trimColor';
         } else if (field === 'doorProduct') {
-            categories = DOOR_OPTIONS;
+            categories = productData.door;
             colorField = 'doorColor';
         } else if (field === 'roofingProduct') {
-            categories = ROOFING_OPTIONS;
+            categories = productData.roofing;
             colorField = 'roofingColor';
         }
         
@@ -78,10 +81,11 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions }) =
         setOptions(prev => ({ ...prev, [field]: value }));
     };
 
-    const sidingColors = findColorsForProduct(SIDING_OPTIONS, options.sidingProduct);
-    const trimColors = findColorsForProduct(TRIM_OPTIONS, options.trimProduct);
-    const doorColors = findColorsForProduct(DOOR_OPTIONS, options.doorProduct);
-    const roofingColors = findColorsForProduct(ROOFING_OPTIONS, options.roofingProduct);
+    // FIX: Use productData from props to find available colors.
+    const sidingColors = findColorsForProduct(productData.siding, options.sidingProduct);
+    const trimColors = findColorsForProduct(productData.trim, options.trimProduct);
+    const doorColors = findColorsForProduct(productData.door, options.doorProduct);
+    const roofingColors = findColorsForProduct(productData.roofing, options.roofingProduct);
 
     const renderProductGroup = (title: string, categories: ProductCategory[], selectedProduct: string, onProductChange: (value: string) => void, availableColors: string[], selectedColor: string, onColorChange: (value: string) => void) => (
         <div>
@@ -126,18 +130,19 @@ export const DesignForm: React.FC<DesignFormProps> = ({ options, setOptions }) =
         <div className="bg-white rounded-xl shadow-lg p-6 border border-gray-200">
             <h2 className="text-2xl font-bold text-gray-700 mb-6">2. Choose Your Products</h2>
             <div className="space-y-8">
-                {renderProductGroup("Siding", SIDING_OPTIONS, options.sidingProduct, (value) => handleProductChange('sidingProduct', value), sidingColors, options.sidingColor, (value) => handleColorChange('sidingColor', value))}
+                {/* FIX: Pass product data from props into rendering function. */}
+                {renderProductGroup("Siding", productData.siding, options.sidingProduct, (value) => handleProductChange('sidingProduct', value), sidingColors, options.sidingColor, (value) => handleColorChange('sidingColor', value))}
                 
                 <div className="pt-8 border-t border-gray-200">
-                    {renderProductGroup("Roofing", ROOFING_OPTIONS, options.roofingProduct, (value) => handleProductChange('roofingProduct', value), roofingColors, options.roofingColor, (value) => handleColorChange('roofingColor', value))}
+                    {renderProductGroup("Roofing", productData.roofing, options.roofingProduct, (value) => handleProductChange('roofingProduct', value), roofingColors, options.roofingColor, (value) => handleColorChange('roofingColor', value))}
                 </div>
 
                 <div className="pt-8 border-t border-gray-200">
-                    {renderProductGroup("Trim", TRIM_OPTIONS, options.trimProduct, (value) => handleProductChange('trimProduct', value), trimColors, options.trimColor, (value) => handleColorChange('trimColor', value))}
+                    {renderProductGroup("Trim", productData.trim, options.trimProduct, (value) => handleProductChange('trimProduct', value), trimColors, options.trimColor, (value) => handleColorChange('trimColor', value))}
                 </div>
 
                 <div className="pt-8 border-t border-gray-200">
-                    {renderProductGroup("Front Door", DOOR_OPTIONS, options.doorProduct, (value) => handleProductChange('doorProduct', value), doorColors, options.doorColor, (value) => handleColorChange('doorColor', value))}
+                    {renderProductGroup("Front Door", productData.door, options.doorProduct, (value) => handleProductChange('doorProduct', value), doorColors, options.doorColor, (value) => handleColorChange('doorColor', value))}
                 </div>
             </div>
         </div>

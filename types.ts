@@ -10,10 +10,10 @@ export interface DesignOptions {
 }
 
 export interface ProductImageUrls {
-  sidingImageUrl: string;
-  trimImageUrl: string;
-  doorImageUrl: string;
-  roofingImageUrl: string;
+  sidingImageUrl?: string;
+  trimImageUrl?: string;
+  doorImageUrl?: string;
+  roofingImageUrl?: string;
 }
 
 export interface ProductOption {
@@ -28,4 +28,11 @@ export interface ProductCategory {
     options: ProductOption[];
 }
 
-export type ProductCategoryKey = 'siding' | 'roofing' | 'trim' | 'door';
+export interface ProductData {
+  siding: ProductCategory[];
+  roofing: ProductCategory[];
+  trim: ProductCategory[];
+  door: ProductCategory[];
+}
+
+export type ProductCategoryKey = keyof ProductData;

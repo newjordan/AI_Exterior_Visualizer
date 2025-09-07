@@ -5,67 +5,49 @@ interface AiScanProps {
   onScanComplete: () => void;
 }
 
-const scanSteps = [
-    "Initializing AI model...",
-    "Analyzing image composition...",
-    "Detecting architectural lines...",
-    "Identifying siding surfaces...",
-    "Tagging roofing materials...",
-    "Mapping trim and windows...",
-    "Locating entryways...",
-    "Finalizing structural analysis...",
-    "Ready for design!",
-];
-
 export const AiScan: React.FC<AiScanProps> = ({ imageUrl, onScanComplete }) => {
-    const [currentStep, setCurrentStep] = useState(0);
     const [progress, setProgress] = useState(0);
+    const [message, setMessage] = useState("Analyzing image composition...");
 
     useEffect(() => {
-        const stepInterval = 400;
-        const totalDuration = scanSteps.length * stepInterval;
+        const messages = [
+            "Identifying architectural elements...",
+            "Mapping surfaces: siding, roof, trim...",
+            "Calibrating light and shadow...",
+            "Preparing your design canvas...",
+        ];
 
-        const stepTimer = setInterval(() => {
-            setCurrentStep(prev => {
-                if (prev < scanSteps.length - 1) {
-                    return prev + 1;
+        const interval = setInterval(() => {
+            setProgress(prev => {
+                const nextProgress = prev + 1;
+                if (nextProgress >= 100) {
+                    clearInterval(interval);
+                    setTimeout(onScanComplete, 500);
+                    setMessage("Analysis complete!");
+                    return 100;
                 }
-                clearInterval(stepTimer);
-                return prev;
+                
+                const messageIndex = Math.floor(nextProgress / (100 / messages.length));
+                setMessage(messages[messageIndex] || messages[messages.length - 1]);
+
+                return nextProgress;
             });
-        }, stepInterval);
-        
-        const progressTimer = setInterval(() => {
-            setProgress(p => p + 100 / (totalDuration / 100));
-        }, 100);
+        }, 50);
 
-        const completionTimer = setTimeout(() => {
-            setProgress(100);
-            onScanComplete();
-        }, totalDuration + 200);
-
-        return () => {
-            clearInterval(stepTimer);
-            clearInterval(progressTimer);
-            clearTimeout(completionTimer);
-        };
+        return () => clearInterval(interval);
     }, [onScanComplete]);
 
     return (
-        <div className="w-full flex flex-col items-center justify-center p-4">
-            <h2 className="text-3xl font-bold text-gray-800 mb-6">AI is Analyzing Your Home</h2>
-            <div className="relative w-full max-w-2xl aspect-[4/3] rounded-xl shadow-2xl overflow-hidden">
-                <img src={imageUrl} alt="House being scanned" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/30"></div>
-                <div className="absolute inset-0 border-4 border-blue-500/50 rounded-xl animate-pulse"></div>
+        <div className="flex-grow flex flex-col items-center justify-center text-center">
+            <div className="relative w-full max-w-xl mx-auto">
+                <div className="absolute -inset-2 rounded-xl bg-blue-500 opacity-20 animate-pulse blur-xl"></div>
+                <img src={imageUrl} alt="House being scanned" className="relative rounded-xl shadow-2xl w-full" />
             </div>
-            <div className="w-full max-w-2xl mt-8">
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${progress}%`, transition: 'width 0.1s linear' }}></div>
+            <div className="w-full max-w-xl mx-auto mt-12">
+                <h2 className="text-2xl font-semibold text-slate-200 mb-4">{message}</h2>
+                <div className="w-full bg-slate-700/50 rounded-full h-2.5">
+                    <div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${progress}%`, transition: 'width 0.1s linear' }}></div>
                 </div>
-                <p className="text-center text-lg text-gray-600 mt-4 h-8 transition-all duration-300">
-                   {scanSteps[currentStep]}
-                </p>
             </div>
         </div>
     );
