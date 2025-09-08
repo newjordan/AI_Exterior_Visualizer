@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Modality, Part } from "@google/genai";
 import type { DesignOptions, ProductData, HouseMasks } from "../types";
 
@@ -178,8 +179,9 @@ export const generateMasks = async (
     const elementsToMask: (keyof HouseMasks)[] = ['siding', 'roofing', 'trim', 'door'];
     const generatedMasks: HouseMasks = {};
 
-    // Generate masks in parallel for efficiency.
-    await Promise.all(elementsToMask.map(async (element) => {
+    // FIX: Generate masks sequentially with a delay to avoid hitting API rate limits.
+    // The previous parallel approach (`Promise.all`) was causing "RESOURCE_EXHAUSTED" errors.
+    for (const [index, element] of elementsToMask.entries()) {
         try {
             progressCallback(element, 'generating');
             let maskData;
@@ -197,7 +199,12 @@ export const generateMasks = async (
             progressCallback(element, 'error');
             // Allow other mask generations to proceed even if one fails.
         }
-    }));
+
+        // Add a delay between API calls to robustly handle rate limits.
+        if (index < elementsToMask.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 1-second delay
+        }
+    }
     
     if (Object.keys(generatedMasks).length === 0) {
         throw new Error("AI analysis failed for all parts of the house. Please try a different image.");

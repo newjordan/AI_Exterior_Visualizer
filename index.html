@@ -7,11 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
-        --grid-color: rgba(255, 255, 255, 0.15);
+        /* Increased opacity for grid lines to make them more pronounced */
+        --grid-color-major: rgba(96, 165, 250, 0.2);
+        --grid-color-minor: rgba(96, 165, 250, 0.1);
         background-color: #0d1a2e;
-        background-image: 
-          radial-gradient(ellipse at center, transparent 30%, #0d1a2e 90%),
-          linear-gradient(135deg, #1a2a45 0%, #101d32 100%);
+        /* Simplified the background to enhance contrast with the grid */
+        background-image: linear-gradient(135deg, #1a2a45 0%, #101d32 100%);
         overflow-x: hidden;
       }
       body::before {
@@ -23,11 +24,18 @@
         bottom: 0;
         z-index: -1;
         background-image: 
-          linear-gradient(var(--grid-color) 1px, transparent 1px), 
-          linear-gradient(to right, var(--grid-color) 1px, transparent 1px);
-        background-size: 2.5rem 2.5rem;
-        mask-image: radial-gradient(ellipse at center, black 10%, transparent 80%);
-        -webkit-mask-image: radial-gradient(ellipse at center, black 10%, transparent 80%);
+          linear-gradient(var(--grid-color-minor) 1px, transparent 1px),
+          linear-gradient(to right, var(--grid-color-minor) 1px, transparent 1px),
+          linear-gradient(var(--grid-color-major) 1px, transparent 1px),
+          linear-gradient(to right, var(--grid-color-major) 1px, transparent 1px);
+        background-size: 
+          1rem 1rem,
+          1rem 1rem,
+          5rem 5rem,
+          5rem 5rem;
+        /* Adjusted the mask to make the grid more visible towards the edges */
+        mask-image: radial-gradient(ellipse at center, black 20%, transparent 85%);
+        -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 85%);
       }
     </style>
   <script type="importmap">
