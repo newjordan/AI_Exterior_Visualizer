@@ -6,9 +6,9 @@ import { DesignStudio } from './components/DesignStudio';
 import { MaskingScreen } from './components/MaskingScreen';
 import { ResultDisplay } from './components/ResultDisplay';
 import { Loader } from './components/Loader';
-import { DevPanel } from './components/DevPanel'; // Import the new DevPanel
+import { DevPanel } from './components/DevPanel';
 import { generateMasks, applyChangesIteratively, generateSingleMask } from './services/geminiService';
-import type { DesignOptions, ProductData, HouseMasks, MaskingProgress, GenerationProgress, ProductOption } from './types';
+import type { DesignOptions, ProductData, HouseMasks, MaskingProgress, GenerationProgress } from './types';
 
 type AppScreen = 'initial' | 'design' | 'masking' | 'result';
 
@@ -28,7 +28,7 @@ const App: React.FC = () => {
   
   const [customMaterials, setCustomMaterials] = useState<Partial<Record<keyof ProductData, File>>>({});
   
-  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false); // State for Dev Panel
+  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -58,7 +58,7 @@ const App: React.FC = () => {
     setImageFile(file);
     setImageUrl(url);
     setError(null);
-    setMasks({}); // Reset previous masks
+    setMasks({});
     
     const initialProgress: MaskingProgress = {
       siding: 'pending',
@@ -83,7 +83,7 @@ const App: React.FC = () => {
     } catch (err) {
       console.error(err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred during AI analysis.');
-      handleReset(); // Go back to start on total failure
+      handleReset();
     }
   };
 
@@ -146,12 +146,6 @@ const App: React.FC = () => {
     setIsDevPanelOpen(false);
   };
   
-  const handleImageChangeOnDesignScreen = (file: File | null, url: string) => {
-     if (file && url) {
-        handleImageSelected(file, url);
-     }
-  }
-
   const handleCustomMaterialAdded = (category: keyof ProductData, file: File) => {
     setCustomMaterials(prev => ({ ...prev, [category]: file }));
   };
@@ -193,10 +187,8 @@ const App: React.FC = () => {
       case 'design':
         return (
           <DesignStudio
-            imageFile={imageFile}
             imageUrl={imageUrl}
-            onImageChange={handleImageChangeOnDesignScreen}
-            productData={productData!} // We know it's loaded here
+            productData={productData!}
             onGenerate={handleGenerate}
             generationProgress={generationProgress}
             customMaterials={customMaterials}
@@ -215,7 +207,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans bg-[radial-gradient(circle_at_1px_1px,#334155_1px,transparent_0)] [background-size:24px_24px]">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       <Header onReset={handleReset} showReset={screen !== 'initial'} />
       <main className="flex-grow flex flex-col">
         {error && (

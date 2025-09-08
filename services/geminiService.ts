@@ -92,6 +92,80 @@ Do not include any other colors, shades of gray, or anti-aliasing. The output mu
 };
 
 /**
+ * Generates a precise 2px red line trace around the perimeter of the house's siding.
+ * @param imageFile The original image of the house.
+ * @returns A promise that resolves to the base64 encoded trace image data.
+ */
+export const generateSidingTrace = async (imageFile: File): Promise<string> => {
+    const imagePart = await fileToGenerativePart(imageFile);
+    
+    const prompt = `From the provided image of a house, act as a precise edge-detection tool. Your task is to draw a 2-pixel thick, solid red (#FF0000) line that perfectly outlines the perimeter of all the 'siding'.
+- 'Siding' is the main exterior wall covering.
+- If there are multiple distinct styles or sections of siding (e.g., horizontal panels on one level, shake shingles on another), draw a separate, closed-loop outline around each individual section.
+- Crucially, you must EXCLUDE all other elements. Do NOT draw lines around windows, doors, trim, the roof, gutters, or shutters. The line should terminate exactly where the siding meets these other elements.
+- Do NOT fill any areas. Only draw the outlines.
+- The output must be ONLY the red lines on a completely transparent background.
+- The final image must have the exact same dimensions as the original input image. Do not output any text.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: {
+            parts: [
+                imagePart,
+                { text: prompt },
+            ],
+        },
+        config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+            return part.inlineData.data;
+        }
+    }
+    
+    throw new Error(`Failed to generate trace for siding. No image was returned from the API.`);
+};
+
+/**
+ * Generates a precise 2px red line trace around the perimeter of the house's trim.
+ * @param imageFile The original image of the house.
+ * @returns A promise that resolves to the base64 encoded trace image data.
+ */
+export const generateTrimTrace = async (imageFile: File): Promise<string> => {
+    const imagePart = await fileToGenerativePart(imageFile);
+    
+    const prompt = `From the provided image of a house, act as a precise edge-detection tool. Your task is to draw a 2-pixel thick, solid red (#FF0000) line that perfectly outlines the perimeter of all the 'trim'.
+- 'Trim' includes the boards framing the windows, the boards framing the doors, the corner boards of the house, and any fascia boards along the roofline.
+- Do NOT fill the area. Only draw the outline.
+- The output must be ONLY the red line on a completely transparent background.
+- The final image must have the exact same dimensions as the original input image. Do not output any text.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: {
+            parts: [
+                imagePart,
+                { text: prompt },
+            ],
+        },
+        config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+    });
+
+    for (const part of response.candidates[0].content.parts) {
+        if (part.inlineData) {
+            return part.inlineData.data;
+        }
+    }
+    
+    throw new Error(`Failed to generate trace for trim. No image was returned from the API.`);
+};
+
+/**
  * Generates masks for all specified parts of a house, reporting progress along the way.
  * @param imageFile The original house image.
  * @param progressCallback A function to call with progress updates.
@@ -108,7 +182,14 @@ export const generateMasks = async (
     await Promise.all(elementsToMask.map(async (element) => {
         try {
             progressCallback(element, 'generating');
-            const maskData = await generateSingleMask(imageFile, element);
+            let maskData;
+            if (element === 'siding') {
+                maskData = await generateSidingTrace(imageFile);
+            } else if (element === 'trim') {
+                maskData = await generateTrimTrace(imageFile);
+            } else {
+                maskData = await generateSingleMask(imageFile, element);
+            }
             generatedMasks[element] = maskData;
             progressCallback(element, 'complete', maskData);
         } catch (error) {
@@ -131,6 +212,7 @@ export const generateMasks = async (
  * @param masks An object containing the segmentation masks for different house parts.
  * @param options The user-selected design choices.
  * @param selectedImageFiles An object mapping house parts to custom material image files or product image URLs.
+ * an object mapping house parts to custom material image files or product image URLs.
  * @param progressCallback A function to report the generation progress.
  * @returns A promise that resolves to the base64 encoded string of the final generated image.
  */
