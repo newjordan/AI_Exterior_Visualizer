@@ -1,8 +1,14 @@
 {
-  "name": "this-beautiful-house",
-  "private": true,
-  "version": "0.0.0",
+  "name": "ai-exterior-visualizer",
+  "description": "AI-powered home exterior design visualization using Google Gemini",
+  "version": "1.0.0",
   "type": "module",
+  "keywords": ["gemini", "ai", "home-design", "visualization", "react", "typescript"],
+  "author": "Jordan",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/newjordan/AI_Exterior_Visualizer.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
