@@ -83,29 +83,11 @@
       "label": "Trim Boards",
       "options": [
         {
-          "value": "Pure White Trim",
-          "label": "Pure White",
-          "colors": ["White"],
-          "imageUrls": [
-            "https://i.imgur.com/k2H1z5F.jpeg",
-            "https://i.imgur.com/9vB4w7L.jpeg"
-          ]
-        },
-        {
           "value": "Simple White Trim",
           "label": "Simple White",
           "colors": ["White"],
           "imageUrls": [
             "https://i.imgur.com/B7bfvnl.png"
-          ]
-        },
-        {
-          "value": "Modern Black Trim",
-          "label": "Modern Black",
-          "colors": ["Black"],
-          "imageUrls": [
-            "https://i.imgur.com/sQ8nL8R.jpeg",
-            "https://i.imgur.com/2pD1M1x.jpeg"
           ]
         },
         {
