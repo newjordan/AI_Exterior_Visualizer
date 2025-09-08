@@ -3,7 +3,7 @@ import { GoogleGenAI, Modality, Part } from "@google/genai";
 import type { DesignOptions, ProductData, HouseMasks } from "../types";
 
 // FIX: Initialize the GoogleGenAI client according to the guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 /**
  * Converts a File object to a GoogleGenAI.Part object for multimodal input.
@@ -62,11 +62,45 @@ const getProductImagePart = async (productSource: File | string): Promise<Part> 
 export const generateSingleMask = async (imageFile: File, element: keyof HouseMasks): Promise<string> => {
     const imagePart = await fileToGenerativePart(imageFile);
     
-    const prompt = `From the provided image of a house, generate a precise, binary segmentation mask for the ${element}. 
-The mask must be entirely black and white. 
+    let prompt: string;
+    
+    if (element === 'siding') {
+        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for ALL siding areas.
+The mask must be entirely black and white.
+- ALL siding areas (the main exterior wall covering, including different styles like horizontal panels, shingles, vinyl, wood, etc.) should be pure white (#FFFFFF).
+- Everything else must be pure black (#000000), including: windows, doors, trim, roof, gutters, shutters, background, sky, trees.
+- If there are multiple siding sections with different styles, include ALL of them as white.
+- The siding should be filled completely, not just outlined.
+Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+    } else if (element === 'trim') {
+        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for ALL trim areas.
+The mask must be entirely black and white.
+- ALL trim areas should be pure white (#FFFFFF), including:
+  * Window trim (frames around windows)
+  * Door trim (frames around doors)
+  * Corner boards (vertical trim at house corners)
+  * Fascia boards (horizontal trim along the roofline)
+  * Any decorative trim or molding
+- Everything else must be pure black (#000000), including: siding, windows, doors, roof, background.
+- The trim areas should be filled completely, not just outlined.
+Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+    } else if (element === 'door') {
+        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for ALL doors.
+The mask must be entirely black and white.
+- ALL door areas should be pure white (#FFFFFF), including:
+  * The entire door panel(s)
+  * Any glass panels within the door
+  * Sidelights if they are part of the door unit
+  * Multiple doors if present (front door, garage doors, side doors)
+- Everything else must be pure black (#000000), including: door frames/trim, siding, windows, roof, background.
+Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+    } else {
+        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for the ${element}.
+The mask must be entirely black and white.
 - The area corresponding to the ${element} should be pure white (#FFFFFF).
 - All other areas, including the background, sky, trees, and other parts of the house, must be pure black (#000000).
 Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+    }
 
     // FIX: Use gemini-2.5-flash-image-preview model for image generation tasks.
     // FIX: Include both Modality.IMAGE and Modality.TEXT in responseModalities as per guidelines.
@@ -92,79 +126,7 @@ Do not include any other colors, shades of gray, or anti-aliasing. The output mu
     throw new Error(`Failed to generate mask for ${element}. No image was returned from the API.`);
 };
 
-/**
- * Generates a precise 2px red line trace around the perimeter of the house's siding.
- * @param imageFile The original image of the house.
- * @returns A promise that resolves to the base64 encoded trace image data.
- */
-export const generateSidingTrace = async (imageFile: File): Promise<string> => {
-    const imagePart = await fileToGenerativePart(imageFile);
-    
-    const prompt = `From the provided image of a house, act as a precise edge-detection tool. Your task is to draw a 2-pixel thick, solid red (#FF0000) line that perfectly outlines the perimeter of all the 'siding'.
-- 'Siding' is the main exterior wall covering.
-- If there are multiple distinct styles or sections of siding (e.g., horizontal panels on one level, shake shingles on another), draw a separate, closed-loop outline around each individual section.
-- Crucially, you must EXCLUDE all other elements. Do NOT draw lines around windows, doors, trim, the roof, gutters, or shutters. The line should terminate exactly where the siding meets these other elements.
-- Do NOT fill any areas. Only draw the outlines.
-- The output must be ONLY the red lines on a completely transparent background.
-- The final image must have the exact same dimensions as the original input image. Do not output any text.`;
 
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image-preview',
-        contents: {
-            parts: [
-                imagePart,
-                { text: prompt },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-        },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-            return part.inlineData.data;
-        }
-    }
-    
-    throw new Error(`Failed to generate trace for siding. No image was returned from the API.`);
-};
-
-/**
- * Generates a precise 2px red line trace around the perimeter of the house's trim.
- * @param imageFile The original image of the house.
- * @returns A promise that resolves to the base64 encoded trace image data.
- */
-export const generateTrimTrace = async (imageFile: File): Promise<string> => {
-    const imagePart = await fileToGenerativePart(imageFile);
-    
-    const prompt = `From the provided image of a house, act as a precise edge-detection tool. Your task is to draw a 2-pixel thick, solid red (#FF0000) line that perfectly outlines the perimeter of all the 'trim'.
-- 'Trim' includes the boards framing the windows, the boards framing the doors, the corner boards of the house, and any fascia boards along the roofline.
-- Do NOT fill the area. Only draw the outline.
-- The output must be ONLY the red line on a completely transparent background.
-- The final image must have the exact same dimensions as the original input image. Do not output any text.`;
-
-    const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image-preview',
-        contents: {
-            parts: [
-                imagePart,
-                { text: prompt },
-            ],
-        },
-        config: {
-            responseModalities: [Modality.IMAGE, Modality.TEXT],
-        },
-    });
-
-    for (const part of response.candidates[0].content.parts) {
-        if (part.inlineData) {
-            return part.inlineData.data;
-        }
-    }
-    
-    throw new Error(`Failed to generate trace for trim. No image was returned from the API.`);
-};
 
 /**
  * Generates masks for all specified parts of a house, reporting progress along the way.
@@ -184,14 +146,7 @@ export const generateMasks = async (
     for (const [index, element] of elementsToMask.entries()) {
         try {
             progressCallback(element, 'generating');
-            let maskData;
-            if (element === 'siding') {
-                maskData = await generateSidingTrace(imageFile);
-            } else if (element === 'trim') {
-                maskData = await generateTrimTrace(imageFile);
-            } else {
-                maskData = await generateSingleMask(imageFile, element);
-            }
+            const maskData = await generateSingleMask(imageFile, element);
             generatedMasks[element] = maskData;
             progressCallback(element, 'complete', maskData);
         } catch (error) {
