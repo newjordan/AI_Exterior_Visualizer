@@ -232,14 +232,17 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({ originalImageUrl, 
         </div>
 
         {/* Full Generated Image Display - No width constraints */}
-        <div className="mt-12">
-          <h3 className="text-2xl font-semibold text-center text-slate-100 mb-6">Final Result</h3>
-          <div className="rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 bg-slate-800 w-fit mx-auto">
-            <img 
-              src={generatedImageUrl} 
-              alt="Final AI Visualization" 
-              className="block max-w-none h-auto"
-            />
+        <div className="mt-12 -mx-4">
+          <h3 className="text-2xl font-semibold text-center text-slate-100 mb-6 px-4">Final Result</h3>
+          <div className="flex justify-center">
+            <div className="rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 bg-slate-800">
+              <img 
+                src={generatedImageUrl} 
+                alt="Final AI Visualization" 
+                className="block h-auto"
+                style={{maxWidth: 'none'}}
+              />
+            </div>
           </div>
         </div>
       </div>

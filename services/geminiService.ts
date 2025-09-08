@@ -65,6 +65,7 @@ export const generateSingleMask = async (imageFile: File, element: keyof HouseMa
     
     if (element === 'siding') {
         prompt = `Create a binary mask for house wall siding.
+CRITICAL: Output must maintain EXACT same dimensions and aspect ratio as input image. Do not crop or resize.
 Output a pure black and white image where:
 - WHITE (#FFFFFF): All wall siding surfaces including gables and dormers
 - BLACK (#000000): Roof shingles, window/door trim frames, windows, doors, sky, ground
@@ -73,6 +74,7 @@ Include siding on all wall surfaces but avoid roof materials and trim boards.
 The mask must be clean with sharp edges. No gray values.`;
     } else if (element === 'trim') {
         prompt = `Create a binary mask for house trim elements.
+CRITICAL: Output must maintain EXACT same dimensions and aspect ratio as input image. Do not crop or resize.
 Output a pure black and white image where:
 - WHITE (#FFFFFF): All trim boards - window frames, door frames, corner boards, fascia boards (solid filled areas)
 - BLACK (#000000): Siding walls, window glass, door panels, roof, sky, ground
@@ -81,13 +83,15 @@ Fill the entire width of trim boards, not just outlines.
 The mask must be clean with sharp edges. No gray values.`;
     } else if (element === 'door') {
         prompt = `Create a binary mask for doors.
+CRITICAL: Output must maintain EXACT same dimensions and aspect ratio as input image. Do not crop or resize.
 Output a pure black and white image where:
-- WHITE (#FFFFFF): All door surfaces including garage doors
-- BLACK (#000000): Everything else (walls, windows, trim, roof, sky, ground)
+- WHITE (#FFFFFF): Entry doors only (front doors, side doors) - exclude garage doors
+- BLACK (#000000): Everything else (walls, windows, trim, roof, sky, ground, garage doors)
 
 The mask must be clean with sharp edges. No gray values.`;
     } else if (element === 'roofing') {
         prompt = `Create a binary mask for roof shingles/tiles only.
+CRITICAL: Output must maintain EXACT same dimensions and aspect ratio as input image. Do not crop or resize.
 Output a pure black and white image where:
 - WHITE (#FFFFFF): Only the roof surface material (shingles, tiles, metal panels)
 - BLACK (#000000): Gutters, fascia boards, siding walls, dormers, windows, chimneys, vents, sky
@@ -96,6 +100,7 @@ Exclude all roof trim, gutters, fascia, and any vertical wall surfaces.
 The mask must be clean with sharp edges. No gray values.`;
     } else {
         prompt = `Create a binary mask for ${element}.
+CRITICAL: Output must maintain EXACT same dimensions and aspect ratio as input image. Do not crop or resize.
 Output a pure black and white image where:
 - WHITE (#FFFFFF): ${element} areas only
 - BLACK (#000000): Everything else
@@ -225,13 +230,15 @@ export const applyChangesIteratively = async (
             const materialPart = await getProductImagePart(materialSource);
             parts.push(materialPart);
             promptText = `Apply the texture from the third image to the white areas of the mask (second image) on the house (first image). 
+CRITICAL: Preserve the EXACT original image dimensions and aspect ratio. Do not crop, resize, or alter the image boundaries. 
 Keep the exact same image dimensions, lighting and shadows realistic. The color should be ${options[colorKey]}.
-Output only the modified house image with identical dimensions.`;
+Output only the modified house image with identical dimensions and full image content.`;
         } else {
             // No material image, just apply a color change based on the product name.
             promptText = `Change the white areas in the mask to ${options[colorKey]} color in the house image.
-The style is "${productName}". Keep the exact same image dimensions, lighting and shadows realistic.
-Output only the modified house image with identical dimensions.`;
+The style is "${productName}". CRITICAL: Preserve the EXACT original image dimensions and aspect ratio. Do not crop, resize, or alter the image boundaries.
+Keep the exact same image dimensions, lighting and shadows realistic.
+Output only the modified house image with identical dimensions and full image content.`;
         }
         
         parts.push({ text: promptText });
