@@ -92,12 +92,36 @@
           ]
         },
         {
+          "value": "Simple White Trim",
+          "label": "Simple White",
+          "colors": ["White"],
+          "imageUrls": [
+            "https://i.imgur.com/B7bfvnl.png"
+          ]
+        },
+        {
           "value": "Modern Black Trim",
           "label": "Modern Black",
           "colors": ["Black"],
           "imageUrls": [
             "https://i.imgur.com/sQ8nL8R.jpeg",
             "https://i.imgur.com/2pD1M1x.jpeg"
+          ]
+        },
+        {
+          "value": "Charcoal Trim",
+          "label": "Charcoal",
+          "colors": ["Charcoal", "Dark Gray"],
+          "imageUrls": [
+            "https://i.imgur.com/Y1V99Hx.png"
+          ]
+        },
+        {
+          "value": "Coffee Trim",
+          "label": "Coffee",
+          "colors": ["Coffee", "Dark Brown"],
+          "imageUrls": [
+            "https://i.imgur.com/ta5X8Qm.png"
           ]
         }
       ]
