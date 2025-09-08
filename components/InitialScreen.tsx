@@ -8,8 +8,14 @@ interface InitialScreenProps {
 
 export const InitialScreen: React.FC<InitialScreenProps> = ({ onImageSelected, onError }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [isApiKeySet, setIsApiKeySet] = useState(false);
 
   const handleFileSelect = (file: File | null | undefined) => {
+    if (!isApiKeySet) {
+      onError("Please enter your Gemini API key first.");
+      return;
+    }
     if (file) {
       if (file.size > 10 * 1024 * 1024) { // 10MB limit
         onError("Image size cannot exceed 10MB.");
@@ -44,6 +50,10 @@ export const InitialScreen: React.FC<InitialScreenProps> = ({ onImageSelected, o
   }, []);
 
   const handleUseDefaultImage = async () => {
+    if (!isApiKeySet) {
+      onError("Please enter your Gemini API key first.");
+      return;
+    }
     try {
         const response = await fetch(DEFAULT_HOUSE_IMAGE_URL);
         if (!response.ok) throw new Error("Network response was not ok");
@@ -57,13 +67,53 @@ export const InitialScreen: React.FC<InitialScreenProps> = ({ onImageSelected, o
     }
   };
 
+  const handleSetApiKey = () => {
+    if (apiKey.trim()) {
+      // Store API key in session storage
+      sessionStorage.setItem('gemini_api_key', apiKey.trim());
+      setIsApiKeySet(true);
+      // Trigger a custom event to notify the service
+      window.dispatchEvent(new CustomEvent('apiKeySet', { detail: apiKey.trim() }));
+    } else {
+      onError("Please enter a valid API key.");
+    }
+  };
+
   return (
     <div className="flex-grow flex flex-col items-center justify-center text-center">
       <h2 className="text-4xl font-bold text-slate-100 mb-4">Visualize Your Home's Future</h2>
       <p className="text-lg text-slate-300 mb-10 max-w-2xl">
         Upload a photo of your home or start with our sample to see how different materials and colors can transform its look.
       </p>
-      <div className="w-full max-w-4xl grid md:grid-cols-2 gap-8">
+      
+      {!isApiKeySet && (
+        <div className="w-full max-w-2xl mb-8 p-6 bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700">
+          <h3 className="text-xl font-semibold text-slate-200 mb-4">Enter Your Gemini API Key</h3>
+          <p className="text-sm text-slate-400 mb-4">
+            To use this tool, you'll need a Gemini Flash Image API key. 
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 ml-1">
+              Get your API key here
+            </a>
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="Enter your Gemini API key"
+              className="flex-grow px-4 py-2 bg-slate-900/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              onKeyPress={(e) => e.key === 'Enter' && handleSetApiKey()}
+            />
+            <button
+              onClick={handleSetApiKey}
+              className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Set Key
+            </button>
+          </div>
+        </div>
+      )}
+      <div className={`w-full max-w-4xl grid md:grid-cols-2 gap-8 ${!isApiKeySet ? 'opacity-50 pointer-events-none' : ''}`}>
         <label
           onDragEnter={handleDragEnter}
           onDragOver={handleDragEnter}

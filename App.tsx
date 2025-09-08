@@ -207,9 +207,33 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative overflow-hidden">
+      {/* Blueprint background pattern */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
+        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="blueprint-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1"/>
+              <path d="M 20 0 L 20 40 M 0 20 L 40 20" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.5"/>
+            </pattern>
+            <pattern id="blueprint-dots" width="40" height="40" patternUnits="userSpaceOnUse">
+              <circle cx="20" cy="20" r="1" fill="currentColor" opacity="0.3"/>
+              <circle cx="40" cy="40" r="1" fill="currentColor" opacity="0.3"/>
+              <circle cx="0" cy="0" r="1" fill="currentColor" opacity="0.3"/>
+              <circle cx="40" cy="0" r="1" fill="currentColor" opacity="0.3"/>
+              <circle cx="0" cy="40" r="1" fill="currentColor" opacity="0.3"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#blueprint-grid)" className="text-blue-400"/>
+          <rect width="100%" height="100%" fill="url(#blueprint-dots)" className="text-blue-400"/>
+        </svg>
+      </div>
+      
+      {/* Subtle gradient overlay for depth */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900/95 to-blue-900/20 pointer-events-none"/>
+      
       <Header onReset={handleReset} showReset={screen !== 'initial'} />
-      <main className="flex-grow flex flex-col">
+      <main className="flex-grow flex flex-col relative z-10">
         {error && (
            <div className="container mx-auto px-4 mt-4">
             <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg" role="alert">

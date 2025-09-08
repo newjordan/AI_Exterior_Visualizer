@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality, Part } from "@google/genai";
 import type { DesignOptions, ProductData, HouseMasks } from "../types";
 
@@ -65,41 +64,43 @@ export const generateSingleMask = async (imageFile: File, element: keyof HouseMa
     let prompt: string;
     
     if (element === 'siding') {
-        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for ALL siding areas.
-The mask must be entirely black and white.
-- ALL siding areas (the main exterior wall covering, including different styles like horizontal panels, shingles, vinyl, wood, etc.) should be pure white (#FFFFFF).
-- Everything else must be pure black (#000000), including: windows, doors, trim, roof, gutters, shutters, background, sky, trees.
-- If there are multiple siding sections with different styles, include ALL of them as white.
-- The siding should be filled completely, not just outlined.
-Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+        prompt = `Create a binary mask for house wall siding.
+Output a pure black and white image where:
+- WHITE (#FFFFFF): All wall siding surfaces including gables and dormers
+- BLACK (#000000): Roof shingles, window/door trim frames, windows, doors, sky, ground
+
+Include siding on all wall surfaces but avoid roof materials and trim boards.
+The mask must be clean with sharp edges. No gray values.`;
     } else if (element === 'trim') {
-        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for ALL trim areas.
-The mask must be entirely black and white.
-- ALL trim areas should be pure white (#FFFFFF), including:
-  * Window trim (frames around windows)
-  * Door trim (frames around doors)
-  * Corner boards (vertical trim at house corners)
-  * Fascia boards (horizontal trim along the roofline)
-  * Any decorative trim or molding
-- Everything else must be pure black (#000000), including: siding, windows, doors, roof, background.
-- The trim areas should be filled completely, not just outlined.
-Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+        prompt = `Create a binary mask for house trim elements.
+Output a pure black and white image where:
+- WHITE (#FFFFFF): All trim boards - window frames, door frames, corner boards, fascia boards (solid filled areas)
+- BLACK (#000000): Siding walls, window glass, door panels, roof, sky, ground
+
+Fill the entire width of trim boards, not just outlines.
+The mask must be clean with sharp edges. No gray values.`;
     } else if (element === 'door') {
-        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for ALL doors.
-The mask must be entirely black and white.
-- ALL door areas should be pure white (#FFFFFF), including:
-  * The entire door panel(s)
-  * Any glass panels within the door
-  * Sidelights if they are part of the door unit
-  * Multiple doors if present (front door, garage doors, side doors)
-- Everything else must be pure black (#000000), including: door frames/trim, siding, windows, roof, background.
-Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+        prompt = `Create a binary mask for doors.
+Output a pure black and white image where:
+- WHITE (#FFFFFF): All door surfaces including garage doors
+- BLACK (#000000): Everything else (walls, windows, trim, roof, sky, ground)
+
+The mask must be clean with sharp edges. No gray values.`;
+    } else if (element === 'roofing') {
+        prompt = `Create a binary mask for roof shingles/tiles only.
+Output a pure black and white image where:
+- WHITE (#FFFFFF): Only the roof surface material (shingles, tiles, metal panels)
+- BLACK (#000000): Gutters, fascia boards, siding walls, dormers, windows, chimneys, vents, sky
+
+Exclude all roof trim, gutters, fascia, and any vertical wall surfaces.
+The mask must be clean with sharp edges. No gray values.`;
     } else {
-        prompt = `From the provided image of a house, generate a precise, binary segmentation mask for the ${element}.
-The mask must be entirely black and white.
-- The area corresponding to the ${element} should be pure white (#FFFFFF).
-- All other areas, including the background, sky, trees, and other parts of the house, must be pure black (#000000).
-Do not include any other colors, shades of gray, or anti-aliasing. The output must be only the mask image. Do not output any text.`;
+        prompt = `Create a binary mask for ${element}.
+Output a pure black and white image where:
+- WHITE (#FFFFFF): ${element} areas only
+- BLACK (#000000): Everything else
+
+The mask must be clean with sharp edges. No gray values.`;
     }
 
     // FIX: Use gemini-2.5-flash-image-preview model for image generation tasks.
@@ -223,10 +224,14 @@ export const applyChangesIteratively = async (
             // A custom texture/material image is provided.
             const materialPart = await getProductImagePart(materialSource);
             parts.push(materialPart);
-            promptText = `Using the primary image of the house, the provided black and white mask, and the material texture image, replace the area of the house indicated by the white portion of the mask with the new material. Maintain the original image's lighting, shadows, and perspective to ensure a photorealistic result. The new ${element} should blend seamlessly. The specified color is ${options[colorKey]}.`;
+            promptText = `Apply the texture from the third image to the white areas of the mask (second image) on the house (first image). 
+Keep the exact same image dimensions, lighting and shadows realistic. The color should be ${options[colorKey]}.
+Output only the modified house image with identical dimensions.`;
         } else {
             // No material image, just apply a color change based on the product name.
-            promptText = `Using the primary image of the house and the provided black and white mask, change the color of the area indicated by the white portion of the mask to ${options[colorKey]}. The product style is "${productName}". Maintain the original image's texture, lighting, shadows, and perspective to ensure a photorealistic result. The new ${element} color should blend seamlessly.`;
+            promptText = `Change the white areas in the mask to ${options[colorKey]} color in the house image.
+The style is "${productName}". Keep the exact same image dimensions, lighting and shadows realistic.
+Output only the modified house image with identical dimensions.`;
         }
         
         parts.push({ text: promptText });
