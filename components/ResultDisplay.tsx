@@ -1,251 +1,168 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface ResultDisplayProps {
   originalImageUrl: string;
   generatedImageUrl: string;
 }
 
-export const ResultDisplay: React.FC<ResultDisplayProps> = ({ originalImageUrl, generatedImageUrl }) => {
-  const [revealState, setRevealState] = useState<'countdown' | 'fading' | 'revealed'>('countdown');
+const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+export const ResultDisplay = ({ originalImageUrl, generatedImageUrl }: ResultDisplayProps) => {
+  const [revealState, setRevealState] = useState<'countdown' | 'fading' | 'revealed'>(() =>
+    prefersReducedMotion() ? 'revealed' : 'countdown',
+  );
   const [countdown, setCountdown] = useState(3);
   const [sliderPosition, setSliderPosition] = useState(50);
-  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (revealState === 'countdown') {
-      if (countdown > 0) {
-        const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-        return () => clearTimeout(timer);
-      } else {
-        // When countdown finishes, start fading
-        const fadeTimer = setTimeout(() => setRevealState('fading'), 500);
-        return () => clearTimeout(fadeTimer);
-      }
+    if (revealState !== 'countdown') return;
+    if (countdown > 0) {
+      const timer = setTimeout(() => setCountdown((value) => value - 1), 1000);
+      return () => clearTimeout(timer);
     }
+    const fadeTimer = setTimeout(() => setRevealState('fading'), 400);
+    return () => clearTimeout(fadeTimer);
   }, [countdown, revealState]);
 
   useEffect(() => {
-    if (revealState === 'fading') {
-      // After fade animation duration (2s), show the final revealed state
-      const revealTimer = setTimeout(() => setRevealState('revealed'), 2000);
-      return () => clearTimeout(revealTimer);
-    }
+    if (revealState !== 'fading') return;
+    const timer = setTimeout(() => setRevealState('revealed'), prefersReducedMotion() ? 0 : 1200);
+    return () => clearTimeout(timer);
   }, [revealState]);
-  
-  // Preload images to ensure smooth transition
-  useEffect(() => {
-    const originalImg = new Image();
-    originalImg.src = originalImageUrl;
-    const generatedImg = new Image();
-    generatedImg.src = generatedImageUrl;
-  }, [originalImageUrl, generatedImageUrl]);
 
-  // This useEffect must always be called, not conditionally
-  useEffect(() => {
-    const handleGlobalMouseUp = () => setIsDragging(false);
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !containerRef.current) return;
-      
-      const rect = containerRef.current.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const percentage = (x / rect.width) * 100;
-      setSliderPosition(Math.min(100, Math.max(0, percentage)));
-    };
-
-    if (isDragging) {
-      document.addEventListener('mouseup', handleGlobalMouseUp);
-      document.addEventListener('mousemove', handleGlobalMouseMove);
-    }
-
-    return () => {
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-    };
-  }, [isDragging]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !containerRef.current) return;
-    
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const percentage = (x / rect.width) * 100;
+  const updateFromClientX = (clientX: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return;
+    const percentage = ((clientX - rect.left) / rect.width) * 100;
     setSliderPosition(Math.min(100, Math.max(0, percentage)));
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!containerRef.current) return;
-    
-    const touch = e.touches[0];
-    const rect = containerRef.current.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const percentage = (x / rect.width) * 100;
-    setSliderPosition(Math.min(100, Math.max(0, percentage)));
+  const nudge = (delta: number) => {
+    setSliderPosition((current) => Math.min(100, Math.max(0, current + delta)));
   };
 
-  const handleSaveImage = () => {
-    // Create a link element and trigger download
+  const saveImage = () => {
     const link = document.createElement('a');
     link.href = generatedImageUrl;
     link.download = `home-transformation-${Date.now()}.png`;
-    document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
-  };
-
-  const handleViewFullImage = () => {
-    // Open generated image in new tab
-    window.open(generatedImageUrl, '_blank');
   };
 
   if (revealState !== 'revealed') {
     return (
-      <div className="fixed inset-0 bg-slate-900 z-50 flex items-center justify-center animate-fade-in-fast p-4">
-        <div className="relative max-w-6xl max-h-[90vh] rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 bg-slate-800">
-           {/* Generated image is underneath */}
-           <img src={generatedImageUrl} alt="AI generated home design" className="block max-w-full max-h-[90vh] object-contain" />
-           
-           {/* Original image is on top and will fade away */}
-           <img 
-              src={originalImageUrl} 
-              alt="Original home" 
-              className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-2000 ease-in-out ${revealState === 'fading' ? 'opacity-0' : 'opacity-100'}`} 
-           />
-           
-           {/* Countdown Overlay */}
-           {revealState === 'countdown' && countdown > 0 && (
-              <div key={countdown} className="absolute inset-0 flex items-center justify-center bg-black/30">
-                  <span className="text-9xl font-bold text-white animate-scale-up-fade-out">{countdown}</span>
-              </div>
-           )}
+      <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col items-center px-4 py-8">
+        <h2 className="text-3xl font-semibold text-slate-50">Your transformation</h2>
+        <p className="sr-only" role="status">
+          Revealing the redesigned exterior.
+        </p>
+        <div className="relative mt-6 w-full overflow-hidden rounded-2xl border border-slate-700 bg-slate-950">
+          <img src={generatedImageUrl} alt="Redesigned home" className="max-h-[75vh] w-full object-contain" />
+          <img
+            src={originalImageUrl}
+            alt=""
+            className={`absolute inset-0 h-full w-full object-contain transition-opacity duration-1000 ${
+              revealState === 'fading' ? 'opacity-0' : 'opacity-100'
+            }`}
+          />
+          {revealState === 'countdown' && countdown > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/35" aria-hidden="true">
+              <span className="text-8xl font-semibold text-white">{countdown}</span>
+            </div>
+          )}
         </div>
-        <style>{`
-            @keyframes fade-in-fast {
-                from { opacity: 0; }
-                to { opacity: 1; }
-            }
-            .animate-fade-in-fast { animation: fade-in-fast 0.5s ease-out forwards; }
-
-            @keyframes scale-up-fade-out {
-                0% { transform: scale(0.5); opacity: 0; }
-                50% { transform: scale(1.1); opacity: 1; }
-                100% { transform: scale(1.2); opacity: 0; }
-            }
-            .animate-scale-up-fade-out { animation: scale-up-fade-out 1s ease-in-out forwards; }
-            .duration-2000 { transition-duration: 2000ms; }
-        `}</style>
+        <button
+          type="button"
+          onClick={() => setRevealState('revealed')}
+          className="mt-4 rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800"
+        >
+          Skip reveal
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="mt-8 animate-fade-in-fast pb-8">
-      <h2 className="text-3xl font-bold text-center text-slate-100 mb-8">Your Transformation</h2>
-      
-      {/* Action buttons */}
-      <div className="flex justify-center gap-4 mb-6">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8">
+      <h2 className="text-center text-3xl font-semibold text-slate-50">Your transformation</h2>
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
         <button
-          onClick={handleSaveImage}
-          className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors flex items-center gap-2 shadow-lg"
+          type="button"
+          onClick={saveImage}
+          className="rounded-lg bg-emerald-700 px-5 py-2 text-sm font-semibold text-white hover:bg-emerald-600"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Save Result
-        </button>
-        <button
-          onClick={handleViewFullImage}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition-colors flex items-center gap-2 shadow-lg"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          View Full Size
+          Save result
         </button>
       </div>
 
-      <div className="mx-auto px-4">
-        {/* Comparison slider */}
-        <div 
-          ref={containerRef}
-          className="relative w-full rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 select-none cursor-ew-resize bg-slate-800 max-w-7xl mx-auto"
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchMove={handleTouchMove}
+      <div
+        ref={containerRef}
+        className="relative mx-auto mt-6 max-w-6xl overflow-hidden rounded-2xl border border-slate-700 bg-slate-950"
+        onPointerDown={(event) => {
+          if (event.target instanceof Element && event.target.closest('[data-slider-handle]')) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          updateFromClientX(event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+          updateFromClientX(event.clientX);
+        }}
+      >
+        <img src={generatedImageUrl} alt="Redesigned home" className="block max-h-[75vh] w-full object-contain" />
+        <div className="pointer-events-none absolute inset-0" style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}>
+          <img src={originalImageUrl} alt="" className="h-full w-full object-contain" />
+        </div>
+        <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-slate-950/75 px-2 py-1 text-xs font-semibold text-white">
+          Before
+        </div>
+        <div className="pointer-events-none absolute right-3 top-3 rounded-md bg-slate-950/75 px-2 py-1 text-xs font-semibold text-white">
+          After
+        </div>
+        <button
+          type="button"
+          data-slider-handle
+          role="slider"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(sliderPosition)}
+          aria-label="Comparison position"
+          aria-describedby="compare-help"
+          className="absolute top-0 bottom-0 w-11 -translate-x-1/2 cursor-ew-resize"
+          style={{ left: `${sliderPosition}%` }}
+          onPointerDown={(event) => {
+            event.stopPropagation();
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            updateFromClientX(event.clientX);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowLeft') {
+              event.preventDefault();
+              nudge(-5);
+            } else if (event.key === 'ArrowRight') {
+              event.preventDefault();
+              nudge(5);
+            } else if (event.key === 'Home') {
+              event.preventDefault();
+              setSliderPosition(0);
+            } else if (event.key === 'End') {
+              event.preventDefault();
+              setSliderPosition(100);
+            }
+          }}
         >
-          {/* AI Visualization (bottom layer) - this sets the container size */}
-          <img 
-            src={generatedImageUrl} 
-            alt="AI Visualization" 
-            className="block w-full h-auto"
-          />
-          
-          {/* Original Image (top layer with clip) */}
-          <div 
-            className="absolute inset-0"
-            style={{ clipPath: `inset(0 ${100 - sliderPosition}% 0 0)` }}
-          >
-            <img 
-              src={originalImageUrl} 
-              alt="Original" 
-              className="w-full h-full object-contain"
-            />
-          </div>
-          
-          {/* Slider Handle */}
-          <div 
-            className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize"
-            style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
-            onMouseDown={handleMouseDown}
-            onTouchStart={() => setIsDragging(true)}
-            onTouchEnd={() => setIsDragging(false)}
-          >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-white rounded-full shadow-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
-              </svg>
-            </div>
-          </div>
-          
-          {/* Labels */}
-          <div className="absolute top-4 left-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-lg">
-            <span className="text-white text-sm font-semibold">Original</span>
-          </div>
-          <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-lg">
-            <span className="text-white text-sm font-semibold">AI Visualization</span>
-          </div>
-        </div>
-        
-        {/* Instructions */}
-        <div className="text-center mt-4">
-          <p className="text-slate-400 text-sm">Drag the slider to compare before and after</p>
-        </div>
-
-        {/* Full Generated Image Display - No width constraints */}
-        <div className="mt-12 -mx-4">
-          <h3 className="text-2xl font-semibold text-center text-slate-100 mb-6 px-4">Final Result</h3>
-          <div className="flex justify-center">
-            <div className="rounded-xl overflow-hidden shadow-2xl border border-slate-700/50 bg-slate-800">
-              <img 
-                src={generatedImageUrl} 
-                alt="Final AI Visualization" 
-                className="block h-auto"
-                style={{maxWidth: 'none'}}
-              />
-            </div>
-          </div>
-        </div>
+          <span className="absolute inset-y-0 left-1/2 w-0.5 -translate-x-1/2 bg-white" />
+          <span className="absolute top-1/2 left-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-900 shadow">
+            ↔
+          </span>
+        </button>
       </div>
+      <p id="compare-help" className="mt-3 text-center text-sm text-slate-300">
+        Drag the handle, or focus it and use the arrow keys, to compare before and after. Saving downloads the full image.
+      </p>
     </div>
   );
 };

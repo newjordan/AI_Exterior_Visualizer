@@ -3,55 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Transform your home's exterior with AI-powered visualization using Google Gemini. Upload a photo and instantly see how different materials would look." />
-    <meta name="keywords" content="AI, home design, exterior visualization, Gemini, renovation, siding, roofing" />
-    <meta name="author" content="Jordan" />
-    <title>AI Exterior Visualizer - Transform Your Home with Gemini AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      body {
-        /* Increased opacity for grid lines to make them more pronounced */
-        --grid-color-major: rgba(96, 165, 250, 0.2);
-        --grid-color-minor: rgba(96, 165, 250, 0.1);
-        background-color: #0d1a2e;
-        /* Simplified the background to enhance contrast with the grid */
-        background-image: linear-gradient(135deg, #1a2a45 0%, #101d32 100%);
-        overflow-x: hidden;
-      }
-      body::before {
-        content: '';
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        z-index: -1;
-        background-image: 
-          linear-gradient(var(--grid-color-minor) 1px, transparent 1px),
-          linear-gradient(to right, var(--grid-color-minor) 1px, transparent 1px),
-          linear-gradient(var(--grid-color-major) 1px, transparent 1px),
-          linear-gradient(to right, var(--grid-color-major) 1px, transparent 1px);
-        background-size: 
-          1rem 1rem,
-          1rem 1rem,
-          5rem 5rem,
-          5rem 5rem;
-        /* Adjusted the mask to make the grid more visible towards the edges */
-        mask-image: radial-gradient(ellipse at center, black 20%, transparent 85%);
-        -webkit-mask-image: radial-gradient(ellipse at center, black 20%, transparent 85%);
-      }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://aistudiocdn.com/react@^19.1.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-    "react/": "https://aistudiocdn.com/react@^19.1.1/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0"
-  }
-}
-</script>
-</head>
+    <meta name="description" content="Preview exterior materials on a photo of your home. Add a Gemini API key when you want AI to repaint siding, roofing, trim, and doors." />
+    <meta name="theme-color" content="#0b1220" />
+    <title>AI Exterior Visualizer</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1220'/%3E%3Cpath d='M6 14 L16 6 L26 14 V26 H6Z' fill='none' stroke='%2360a5fa' stroke-width='2'/%3E%3C/svg%3E" />
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>

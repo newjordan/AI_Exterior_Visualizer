@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { HouseMasks, MaskingProgress } from '../types';
 import { Loader } from './Loader';
 
-// FIX: This component was missing. Implemented DevPanel to view masks and trigger regeneration.
 interface DevPanelProps {
   originalImage: string;
   masks: HouseMasks;
@@ -11,140 +10,103 @@ interface DevPanelProps {
   progress: MaskingProgress | null;
 }
 
-/**
- * A component to display a single mask preview and its controls.
- */
-const MaskPreview: React.FC<{
-    element: keyof HouseMasks;
-    maskData?: string;
-    onRegenerate: () => void;
-    isGenerating: boolean;
-}> = ({ element, maskData, onRegenerate, isGenerating }) => {
-    return (
-        <div className="bg-slate-700/50 p-4 rounded-lg flex flex-col">
-            <h4 className="text-lg font-semibold capitalize mb-3 text-slate-200">{element}</h4>
-            <div className="aspect-square w-full bg-slate-800 rounded-md mb-3 flex items-center justify-center overflow-hidden">
-                {maskData ? (
-                    <img src={`data:image/png;base64,${maskData}`} alt={`${element} mask`} className="object-contain w-full h-full" />
-                ) : (
-                    <span className="text-sm text-slate-400">No mask generated</span>
-                )}
-            </div>
-            <button
-                onClick={onRegenerate}
-                disabled={isGenerating}
-                className="w-full mt-auto bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 disabled:bg-indigo-400 disabled:cursor-not-allowed transition-colors duration-200 flex items-center justify-center text-sm"
-            >
-                {isGenerating ? (
-                    <>
-                        <Loader size="xs" />
-                        <span className="ml-2">Generating...</span>
-                    </>
-                ) : (
-                    'Regenerate'
-                )}
-            </button>
-        </div>
-    );
-};
+const elements: (keyof HouseMasks)[] = ['siding', 'roofing', 'trim', 'door'];
 
-/**
- * The DevPanel component provides a UI for developers to inspect the generated masks
- * and re-trigger mask generation for specific elements of the house.
- */
-export const DevPanel: React.FC<DevPanelProps> = ({
-  originalImage,
-  masks,
-  onClose,
+const MaskPreview = ({
+  element,
+  maskData,
   onRegenerate,
-  progress,
-}) => {
-  const [activeTab, setActiveTab] = useState<'masks' | 'original'>('masks');
-  const elements = ['siding', 'roofing', 'trim', 'door'] as (keyof HouseMasks)[];
+  isGenerating,
+}: {
+  element: keyof HouseMasks;
+  maskData?: string;
+  onRegenerate: () => void;
+  isGenerating: boolean;
+}) => (
+  <div className="flex flex-col rounded-xl bg-slate-800/80 p-4">
+    <h3 className="mb-3 text-base font-semibold capitalize text-slate-100">{element}</h3>
+    <div className="mb-3 flex aspect-square items-center justify-center overflow-hidden rounded-lg bg-slate-950">
+      {maskData ? (
+        <img src={`data:image/png;base64,${maskData}`} alt={`${element} mask`} className="h-full w-full object-contain" />
+      ) : (
+        <span className="px-3 text-center text-sm text-slate-300">No mask yet</span>
+      )}
+    </div>
+    <button
+      type="button"
+      onClick={onRegenerate}
+      disabled={isGenerating}
+      className="mt-auto inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-300"
+    >
+      {isGenerating ? (
+        <>
+          <Loader size="xs" />
+          <span className="ml-2">Generating</span>
+        </>
+      ) : (
+        'Regenerate'
+      )}
+    </button>
+  </div>
+);
+
+export const DevPanel = ({ originalImage, masks, onClose, onRegenerate, progress }: DevPanelProps) => {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const titleId = 'mask-inspector-title';
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onCloseRef.current();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      previouslyFocused?.focus();
+    };
+  }, []);
 
   return (
-    <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex justify-end animate-fade-in">
+    <div className="fixed inset-0 z-[80] flex justify-end bg-slate-950/70" onClick={onClose}>
       <div
-        className="relative w-full max-w-lg h-full bg-slate-800 shadow-2xl border-l border-slate-700 flex flex-col animate-slide-in-right"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="dev-panel-title"
-        onClick={(e) => e.stopPropagation()}
+        aria-labelledby={titleId}
+        className="flex h-full w-full max-w-lg flex-col border-l border-slate-700 bg-slate-900 shadow-2xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex-shrink-0 flex justify-between items-center p-4 border-b border-slate-700">
-          <h2 id="dev-panel-title" className="text-xl font-bold text-slate-100">
-            Developer Panel
+        <header className="flex items-center justify-between border-b border-slate-700 px-4 py-4">
+          <h2 id={titleId} className="text-xl font-semibold text-slate-50">
+            Mask inspector
           </h2>
           <button
+            ref={closeRef}
+            type="button"
             onClick={onClose}
-            className="p-2 rounded-full text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
-            aria-label="Close developer panel"
+            className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
+            Close
           </button>
         </header>
-
-        <nav className="flex-shrink-0 border-b border-slate-700">
-          <div className="flex space-x-2 px-4">
-            <button
-              onClick={() => setActiveTab('masks')}
-              className={`py-3 px-4 font-medium text-sm transition-colors ${
-                activeTab === 'masks'
-                  ? 'border-b-2 border-blue-400 text-blue-300'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Generated Masks
-            </button>
-            <button
-              onClick={() => setActiveTab('original')}
-              className={`py-3 px-4 font-medium text-sm transition-colors ${
-                activeTab === 'original'
-                  ? 'border-b-2 border-blue-400 text-blue-300'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Original Image
-            </button>
+        <div className="flex-1 overflow-y-auto p-4">
+          <img src={originalImage} alt="House being edited" className="mb-4 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-3">
+            {elements.map((element) => (
+              <MaskPreview
+                key={element}
+                element={element}
+                maskData={masks[element]}
+                onRegenerate={() => onRegenerate(element)}
+                isGenerating={progress?.[element] === 'generating'}
+              />
+            ))}
           </div>
-        </nav>
-
-        <main className="flex-grow overflow-y-auto p-4">
-          {activeTab === 'masks' && (
-            <div className="grid grid-cols-2 gap-4">
-              {elements.map((element) => (
-                <MaskPreview
-                  key={element}
-                  element={element}
-                  maskData={masks[element]}
-                  onRegenerate={() => onRegenerate(element)}
-                  isGenerating={progress?.[element] === 'generating'}
-                />
-              ))}
-            </div>
-          )}
-          {activeTab === 'original' && (
-            <div>
-              <img src={originalImage} alt="Original house" className="rounded-lg w-full" />
-            </div>
-          )}
-        </main>
+        </div>
       </div>
-       {/* Animations to match other modals in the application */}
-      <style>{`
-        @keyframes fade-in {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        @keyframes slide-in-right {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
-        .animate-fade-in { animation: fade-in 0.3s ease-out forwards; }
-        .animate-slide-in-right { animation: slide-in-right 0.3s ease-out forwards; }
-      `}</style>
     </div>
   );
 };

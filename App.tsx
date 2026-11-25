@@ -1,117 +1,148 @@
-import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
-import { Footer } from './components/Footer';
-import { InitialScreen } from './components/InitialScreen';
+import { useMemo, useRef, useState } from 'react';
+import catalog from './products.json';
 import { DesignStudio } from './components/DesignStudio';
+import { DevPanel } from './components/DevPanel';
+import { Footer } from './components/Footer';
+import { Header } from './components/Header';
+import { InitialScreen } from './components/InitialScreen';
 import { MaskingScreen } from './components/MaskingScreen';
 import { ResultDisplay } from './components/ResultDisplay';
-import { Loader } from './components/Loader';
-import { DevPanel } from './components/DevPanel';
-import { generateMasks, applyChangesIteratively, generateSingleMask } from './services/geminiService';
-import type { DesignOptions, ProductData, HouseMasks, MaskingProgress, GenerationProgress } from './types';
+import { clearSessionApiKey, getApiKey, getSessionApiKey, hasConfiguredEnvKey, setSessionApiKey } from './services/apiKey';
+import { isAbortError, toUserMessage } from './services/errors';
+import type { DesignOptions, GenerationProgress, HouseMasks, MaskingProgress, ProductData } from './types';
 
 type AppScreen = 'initial' | 'design' | 'masking' | 'result';
+type Banner = { tone: 'error' | 'warning'; message: string } | null;
 
-const App: React.FC = () => {
+const maskElements: (keyof HouseMasks)[] = ['siding', 'roofing', 'trim', 'door'];
+
+const isProductData = (value: unknown): value is ProductData => {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as ProductData;
+  return [data.siding, data.roofing, data.trim, data.door].every(Array.isArray);
+};
+
+const productData = isProductData(catalog) ? catalog : null;
+
+const emptyProgress = (): MaskingProgress => ({
+  siding: 'pending',
+  roofing: 'pending',
+  trim: 'pending',
+  door: 'pending',
+});
+
+const App = () => {
   const [screen, setScreen] = useState<AppScreen>('initial');
-  const [error, setError] = useState<string | null>(null);
-  const [productData, setProductData] = useState<ProductData | null>(null);
-  
+  const [banner, setBanner] = useState<Banner>(productData ? null : { tone: 'error', message: 'The material catalog could not be read.' });
+  const [keyRevision, setKeyRevision] = useState(0);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>('');
-  
+  const [imageUrl, setImageUrl] = useState('');
   const [masks, setMasks] = useState<HouseMasks>({});
   const [maskingProgress, setMaskingProgress] = useState<MaskingProgress | null>(null);
-
-  const [generatedImageUrl, setGeneratedImageUrl] = useState<string>('');
+  const [generatedImageUrl, setGeneratedImageUrl] = useState('');
   const [generationProgress, setGenerationProgress] = useState<GenerationProgress>({ active: false, message: '', percentage: 0 });
-  
   const [customMaterials, setCustomMaterials] = useState<Partial<Record<keyof ProductData, File>>>({});
-  
-  const [isDevPanelOpen, setIsDevPanelOpen] = useState(false);
+  const [isInspectorOpen, setIsInspectorOpen] = useState(false);
+  const requestId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch('/products.json');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data: ProductData = await response.json();
-        setProductData(data);
-      } catch (e) {
-        console.error("Failed to fetch product data:", e);
-        setError("Could not load the product catalog. Please try refreshing the page.");
-      }
-    };
-    fetchProducts();
-  }, []);
+  const apiKey = useMemo(() => getApiKey(), [keyRevision]);
+  const usingSessionKey = useMemo(() => Boolean(getSessionApiKey()), [keyRevision]);
+  const usingEnvKey = hasConfiguredEnvKey() && !usingSessionKey;
+  const hasApiKey = Boolean(apiKey);
+  const hasMasks = maskElements.some((element) => Boolean(masks[element]));
 
-  useEffect(() => {
-    if (error) {
-      const timer = setTimeout(() => setError(null), 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [error]);
+  const cancelWork = () => {
+    requestId.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+  };
 
-  const handleImageSelected = async (file: File, url: string) => {
+  const beginRequest = () => {
+    cancelWork();
+    setGenerationProgress({ active: false, message: '', percentage: 0 });
+    const id = requestId.current;
+    const controller = new AbortController();
+    abortRef.current = controller;
+    return { id, signal: controller.signal };
+  };
+
+  const stillCurrent = (id: number) => id === requestId.current;
+
+  const rememberImage = (file: File, url: string) => {
+    if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
     setImageFile(file);
     setImageUrl(url);
-    setError(null);
     setMasks({});
-    
-    const initialProgress: MaskingProgress = {
-      siding: 'pending',
-      roofing: 'pending',
-      trim: 'pending',
-      door: 'pending',
-    };
-    setMaskingProgress(initialProgress);
+    setGeneratedImageUrl('');
+    setMaskingProgress(null);
+    setBanner(null);
+  };
+
+  const runAnalysis = async (file: File) => {
+    const { id, signal } = beginRequest();
+    setMaskingProgress(emptyProgress());
     setScreen('masking');
+    setBanner(null);
 
     const progressCallback = (element: keyof HouseMasks, status: 'generating' | 'complete' | 'error', data?: string) => {
-      setMaskingProgress(prev => ({ ...prev!, [element]: status }));
+      if (!stillCurrent(id)) return;
+      setMaskingProgress((current) => ({ ...(current ?? emptyProgress()), [element]: status }));
       if (status === 'complete' && data) {
-        setMasks(prev => ({ ...prev, [element]: data }));
+        setMasks((current) => ({ ...current, [element]: data }));
       }
     };
 
     try {
-      const generatedMasks = await generateMasks(file, progressCallback);
-      setMasks(generatedMasks);
+      const { generateMasks } = await import('./services/geminiService');
+      const generated = await generateMasks(file, progressCallback, signal);
+      if (!stillCurrent(id)) return;
+      setMasks(generated);
+      const missing = maskElements.filter((element) => !generated[element]);
+      if (missing.length > 0) {
+        setBanner({
+          tone: 'warning',
+          message: `Analysis finished without a mask for ${missing.join(', ')}. Those areas will stay as they are.`,
+        });
+      }
       setScreen('design');
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred during AI analysis.');
-      handleReset();
+    } catch (error) {
+      if (!stillCurrent(id) || isAbortError(error)) return;
+      console.error(error);
+      setBanner({ tone: 'error', message: toUserMessage(error) });
+      setScreen('design');
     }
   };
 
+  const handleImageSelected = (file: File, url: string) => {
+    cancelWork();
+    rememberImage(file, url);
+    if (!getApiKey()) {
+      setScreen('design');
+      return;
+    }
+    void runAnalysis(file);
+  };
+
   const findProductImageUrl = (productName: string): string | undefined => {
-      if (!productData) return undefined;
-      for (const categoryKey of Object.keys(productData)) {
-          const key = categoryKey as keyof ProductData;
-          for (const category of productData[key]) {
-              const product = category.options.find(p => p.value === productName);
-              if (product) {
-                  return product.imageUrls[0];
-              }
-          }
+    if (!productData) return undefined;
+    for (const categoryKey of Object.keys(productData) as (keyof ProductData)[]) {
+      for (const category of productData[categoryKey]) {
+        const product = category.options.find((option) => option.value === productName);
+        if (product?.imageUrls[0]) return product.imageUrls[0];
       }
-      return undefined;
+    }
+    return undefined;
   };
 
   const handleGenerate = async (options: DesignOptions) => {
     if (!imageFile) {
-      setError('Cannot generate design without an image.');
+      setBanner({ tone: 'error', message: 'Choose a photo before generating a design.' });
       return;
     }
-    setGenerationProgress({ active: true, message: 'Starting visualization...', percentage: 0 });
-    setError(null);
-    
-    const progressCallback = (message: string, percentage: number) => {
-        setGenerationProgress({ active: true, message, percentage });
-    };
+    const { id, signal } = beginRequest();
+    setGenerationProgress({ active: true, message: 'Starting visualization…', percentage: 0 });
+    setBanner(null);
 
     const selectedImageFiles: Partial<Record<keyof ProductData, File | string>> = {
       siding: options.sidingProduct === 'custom-siding' ? customMaterials.siding : findProductImageUrl(options.sidingProduct),
@@ -121,19 +152,38 @@ const App: React.FC = () => {
     };
 
     try {
-      const generatedImageBase64 = await applyChangesIteratively(imageFile, masks, options, selectedImageFiles, progressCallback);
+      const { applyChangesIteratively } = await import('./services/geminiService');
+      const generatedImageBase64 = await applyChangesIteratively(
+        imageFile,
+        masks,
+        options,
+        selectedImageFiles,
+        (message, percentage) => {
+          if (stillCurrent(id)) setGenerationProgress({ active: true, message, percentage });
+        },
+        signal,
+      );
+      if (!stillCurrent(id)) return;
+      if (!generatedImageBase64) {
+        throw new Error('The visualization finished without an image.');
+      }
       setGeneratedImageUrl(`data:image/png;base64,${generatedImageBase64}`);
       setScreen('result');
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred during image generation.');
+    } catch (error) {
+      if (!stillCurrent(id) || isAbortError(error)) return;
+      console.error(error);
+      setBanner({ tone: 'error', message: toUserMessage(error) });
       setScreen('design');
     } finally {
-      setGenerationProgress({ active: false, message: '', percentage: 0 });
+      if (stillCurrent(id)) {
+        setGenerationProgress({ active: false, message: '', percentage: 0 });
+      }
     }
   };
 
   const handleReset = () => {
+    cancelWork();
+    if (imageUrl.startsWith('blob:')) URL.revokeObjectURL(imageUrl);
     setScreen('initial');
     setImageFile(null);
     setImageUrl('');
@@ -141,126 +191,132 @@ const App: React.FC = () => {
     setGeneratedImageUrl('');
     setMaskingProgress(null);
     setGenerationProgress({ active: false, message: '', percentage: 0 });
-    setError(null);
+    setBanner(productData ? null : { tone: 'error', message: 'The material catalog could not be read.' });
     setCustomMaterials({});
-    setIsDevPanelOpen(false);
-  };
-  
-  const handleCustomMaterialAdded = (category: keyof ProductData, file: File) => {
-    setCustomMaterials(prev => ({ ...prev, [category]: file }));
+    setIsInspectorOpen(false);
   };
 
   const handleRegenerateMask = async (element: keyof HouseMasks) => {
     if (!imageFile) {
-        setError("Cannot regenerate mask without the original image.");
-        return;
+      setBanner({ tone: 'error', message: 'Choose a photo before regenerating a mask.' });
+      return;
     }
-    setMaskingProgress(prev => ({ ...prev!, [element]: 'generating' }));
+    const { id, signal } = beginRequest();
+    setMaskingProgress((current) => ({ ...(current ?? emptyProgress()), [element]: 'generating' }));
     try {
-        const newMaskData = await generateSingleMask(imageFile, element);
-        setMasks(prev => ({ ...prev, [element]: newMaskData }));
-        setMaskingProgress(prev => ({ ...prev!, [element]: 'complete' }));
-    } catch (err) {
-        console.error(`Failed to re-generate mask for ${element}:`, err);
-        setError(`Failed to re-generate the ${element} mask.`);
-        setMaskingProgress(prev => ({ ...prev!, [element]: 'error' }));
+      const { generateSingleMask } = await import('./services/geminiService');
+      const newMaskData = await generateSingleMask(imageFile, element, signal);
+      if (!stillCurrent(id)) return;
+      setMasks((current) => ({ ...current, [element]: newMaskData }));
+      setMaskingProgress((current) => ({ ...(current ?? emptyProgress()), [element]: 'complete' }));
+    } catch (error) {
+      if (!stillCurrent(id) || isAbortError(error)) return;
+      console.error(error);
+      setBanner({ tone: 'error', message: toUserMessage(error) });
+      setMaskingProgress((current) => ({ ...(current ?? emptyProgress()), [element]: 'error' }));
     }
   };
 
   const renderScreen = () => {
-    if (!productData && !error) {
+    if (!productData) return null;
+    if (screen === 'masking') {
+      return <MaskingScreen progress={maskingProgress} masks={masks} />;
+    }
+    if (screen === 'design') {
       return (
-        <div className="flex-grow flex items-center justify-center">
-            <div className="text-center">
-                <Loader size="lg" />
-                <p className="mt-4 text-slate-300">Loading Design Options...</p>
-            </div>
-        </div>
+        <DesignStudio
+          imageUrl={imageUrl}
+          productData={productData}
+          hasApiKey={hasApiKey}
+          usingSessionKey={usingSessionKey}
+          usingEnvKey={usingEnvKey}
+          hasMasks={hasMasks}
+          onApiKeySave={(key) => {
+            setSessionApiKey(key);
+            setKeyRevision((value) => value + 1);
+          }}
+          onApiKeyClear={() => {
+            clearSessionApiKey();
+            setKeyRevision((value) => value + 1);
+          }}
+          onAnalyze={() => {
+            if (imageFile) void runAnalysis(imageFile);
+          }}
+          onGenerate={handleGenerate}
+          generationProgress={generationProgress}
+          customMaterials={customMaterials}
+          onCustomMaterialAdded={(category, file) => {
+            setCustomMaterials((current) => ({ ...current, [category]: file }));
+          }}
+          />
       );
     }
-
-    switch (screen) {
-      case 'initial':
-        return <InitialScreen onImageSelected={handleImageSelected} onError={setError} />;
-      case 'masking':
-        return <MaskingScreen progress={maskingProgress} masks={masks} />;
-      case 'design':
-        return (
-          <DesignStudio
-            imageUrl={imageUrl}
-            productData={productData!}
-            onGenerate={handleGenerate}
-            generationProgress={generationProgress}
-            customMaterials={customMaterials}
-            onCustomMaterialAdded={handleCustomMaterialAdded}
-          />
-        );
-      case 'result':
-        return (
-          <div className="container mx-auto px-4 py-8">
-            <ResultDisplay originalImageUrl={imageUrl} generatedImageUrl={generatedImageUrl} />
-          </div>
-        );
-      default:
-        return <InitialScreen onImageSelected={handleImageSelected} onError={setError} />;
+    if (screen === 'result') {
+      return <ResultDisplay originalImageUrl={imageUrl} generatedImageUrl={generatedImageUrl} />;
     }
+    return (
+      <InitialScreen
+        hasApiKey={hasApiKey}
+        usingSessionKey={usingSessionKey}
+        usingEnvKey={usingEnvKey}
+        onApiKeySave={(key) => {
+          setSessionApiKey(key);
+          setKeyRevision((value) => value + 1);
+        }}
+        onApiKeyClear={() => {
+          clearSessionApiKey();
+          setKeyRevision((value) => value + 1);
+        }}
+        onImageSelected={handleImageSelected}
+        onError={(message) => setBanner({ tone: 'error', message })}
+      />
+    );
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans relative overflow-hidden">
-      {/* Blueprint background pattern */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
-        <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <pattern id="blueprint-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="currentColor" strokeWidth="1"/>
-              <path d="M 20 0 L 20 40 M 0 20 L 40 20" fill="none" stroke="currentColor" strokeWidth="0.5" opacity="0.5"/>
-            </pattern>
-            <pattern id="blueprint-dots" width="40" height="40" patternUnits="userSpaceOnUse">
-              <circle cx="20" cy="20" r="1" fill="currentColor" opacity="0.3"/>
-              <circle cx="40" cy="40" r="1" fill="currentColor" opacity="0.3"/>
-              <circle cx="0" cy="0" r="1" fill="currentColor" opacity="0.3"/>
-              <circle cx="40" cy="0" r="1" fill="currentColor" opacity="0.3"/>
-              <circle cx="0" cy="40" r="1" fill="currentColor" opacity="0.3"/>
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#blueprint-grid)" className="text-blue-400"/>
-          <rect width="100%" height="100%" fill="url(#blueprint-dots)" className="text-blue-400"/>
-        </svg>
-      </div>
-      
-      {/* Subtle gradient overlay for depth */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-900/95 to-blue-900/20 pointer-events-none"/>
-      
-      <Header onReset={handleReset} showReset={screen !== 'initial'} />
-      <main className="flex-grow flex flex-col relative z-10">
-        {error && (
-           <div className="container mx-auto px-4 mt-4">
-            <div className="bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg" role="alert">
-              <strong className="font-bold">An error occurred: </strong>
-              <span className="mt-1 block sm:inline">{error}</span>
+    <div className="relative flex min-h-screen flex-col font-sans text-slate-100">
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
+      <Header onReset={handleReset} showReset={screen !== 'initial'} aiReady={hasApiKey} />
+      <main id="main" className="flex flex-1 flex-col" tabIndex={-1}>
+        {banner && (
+          <div className="mx-auto mt-4 w-full max-w-6xl px-4">
+            <div
+              role={banner.tone === 'error' ? 'alert' : 'status'}
+              className={`flex items-start justify-between gap-4 rounded-xl border px-4 py-3 ${
+                banner.tone === 'error'
+                  ? 'border-red-700 bg-red-950/80 text-red-100'
+                  : 'border-amber-700 bg-amber-950/80 text-amber-100'
+              }`}
+            >
+              <p>{banner.message}</p>
+              <button type="button" onClick={() => setBanner(null)} className="shrink-0 text-sm font-semibold underline">
+                Dismiss
+              </button>
             </div>
           </div>
         )}
         {renderScreen()}
       </main>
       <Footer />
-      {screen === 'design' && Object.keys(masks).length > 0 && (
-          <button
-              onClick={() => setIsDevPanelOpen(true)}
-              className="fixed bottom-4 right-4 bg-blue-600 text-white font-bold py-2 px-4 rounded-lg shadow-lg hover:bg-blue-700 transition-colors z-50"
-          >
-              Dev
-          </button>
+      {screen === 'design' && hasApiKey && (
+        <button
+          type="button"
+          onClick={() => setIsInspectorOpen(true)}
+          className="fixed right-4 bottom-4 z-40 rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white shadow-lg ring-1 ring-slate-600 hover:bg-slate-700"
+        >
+          Inspect masks
+        </button>
       )}
-      {isDevPanelOpen && (
-          <DevPanel
-              originalImage={imageUrl}
-              masks={masks}
-              onClose={() => setIsDevPanelOpen(false)}
-              onRegenerate={handleRegenerateMask}
-              progress={maskingProgress}
-          />
+      {isInspectorOpen && (
+        <DevPanel
+          originalImage={imageUrl}
+          masks={masks}
+          onClose={() => setIsInspectorOpen(false)}
+          onRegenerate={handleRegenerateMask}
+          progress={maskingProgress}
+        />
       )}
     </div>
   );

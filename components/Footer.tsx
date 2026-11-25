@@ -1,12 +1,9 @@
-import React from 'react';
-
-export const Footer: React.FC = () => {
+export const Footer = () => {
   return (
-    <footer className="bg-transparent mt-auto border-t border-slate-700/50">
-      <div className="container mx-auto px-4 py-4 text-center">
-        <p className="text-sm text-slate-400">
-          Powered by Google Gemini. Visualize your dream home today.
-        </p>
+    <footer className="mt-auto border-t border-slate-700/80">
+      <div className="mx-auto max-w-6xl px-4 py-4 text-center text-sm text-slate-300">
+        <p>Preview the material catalog without a key. Visualization calls the Gemini API from your browser.</p>
+        <p className="mt-1 text-xs text-slate-400">Sample house photo via Pexels.</p>
       </div>
     </footer>
   );
